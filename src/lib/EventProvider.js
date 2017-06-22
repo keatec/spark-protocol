@@ -26,7 +26,6 @@ class EventProvider {
     (event: Event) => {
       const eventToBroadcast: Event = ({
         ...event,
-        broadcasted: true,
       }: any);
 
       callback(eventToBroadcast);
