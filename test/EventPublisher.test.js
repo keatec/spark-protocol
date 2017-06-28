@@ -9,19 +9,15 @@ import { getRequestEventName } from '../src/lib/EventPublisher';
 
 const TEST_EVENT_NAME = 'testEvent';
 
-function checkIfCalled(called, handler) {
+var getCallCount = async (handler): Promise<number> => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      if (called) {
-        handler.called ? resolve() : reject('Was not called');
-      } else {
-        handler.called ? reject('Was called') : resolve();
-      }
+      resolve(handler.callCount);
     }, 100);
   });
-}
+};
 
-test('should subscribe to event', t => {
+test('should subscribe to event', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const eventData = {
@@ -34,10 +30,10 @@ test('should subscribe to event', t => {
   });
 
   eventPublisher.publish(eventData, { isPublic: true });
-  return checkIfCalled(true, handler);
+  t.truthy((await getCallCount(handler)) == 1);
 });
 
-test('should listen for public event from another owner device', t => {
+test('should listen for public event from another owner device', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const eventData = {
@@ -50,10 +46,10 @@ test('should listen for public event from another owner device', t => {
   });
 
   eventPublisher.publish(eventData, { isPublic: true });
-  return checkIfCalled(true, handler);
+  t.truthy((await getCallCount(handler)) == 1);
 });
 
-test('should filter private event', t => {
+test('should filter private event', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const eventData = {
@@ -66,10 +62,11 @@ test('should filter private event', t => {
   });
 
   eventPublisher.publish(eventData, { isPublic: false });
-  return checkIfCalled(false, handler);
+
+  t.truthy((await getCallCount(handler)) == 0);
 });
 
-test('should filter internal event', t => {
+test('should filter internal event', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const eventData = {
@@ -81,10 +78,17 @@ test('should filter internal event', t => {
   });
 
   eventPublisher.publish(eventData, { isInternal: true });
-  return checkIfCalled(false, handler);
+  eventPublisher.publish(eventData, { isInternal: true, isPublic: true });
+  eventPublisher.publish(eventData, { isInternal: true, isPublic: false });
+  t.truthy((await getCallCount(handler)) == 0);
+
+  eventPublisher.publish(eventData, { isInternal: false });
+  eventPublisher.publish(eventData, { isInternal: false, isPublic: true });
+  eventPublisher.publish(eventData, { isInternal: false, isPublic: false });
+  t.truthy((await getCallCount(handler)) == 3);
 });
 
-test('should filter event by connectionID', t => {
+test('should filter event by connectionID', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const connectionID = '123';
@@ -98,18 +102,19 @@ test('should filter event by connectionID', t => {
   });
 
   eventPublisher.publish(eventData, { isPublic: false });
+  t.truthy((await getCallCount(handler)) == 0);
 
-  return checkIfCalled(false, handler);
+  eventPublisher.publish(eventData, { isPublic: true });
+  t.truthy((await getCallCount(handler)) == 1);
 });
 
-test('should filter event by deviceID', t => {
+test('should filter event by deviceID', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const ownerID = TestData.getID();
   const deviceEvent = {
     name: TEST_EVENT_NAME,
     userID: ownerID,
-    isPublic: false,
     deviceID: TestData.getID(),
   };
 
@@ -117,11 +122,12 @@ test('should filter event by deviceID', t => {
   const notDeviceEvent = {
     name: TEST_EVENT_NAME,
     userID: ownerID,
+    deviceID: TestData.getID(),
   };
 
   eventPublisher.subscribe(deviceEvent.name, handler, {
     filterOptions: {
-      deviceID: TestData.getID(),
+      deviceID: deviceEvent.deviceID,
       userID: deviceEvent.userID,
     },
   });
@@ -129,15 +135,22 @@ test('should filter event by deviceID', t => {
   eventPublisher.publish(deviceEvent, { isPublic: false });
   eventPublisher.publish(notDeviceEvent, { isPublic: false });
 
-  return checkIfCalled(false, handler);
+  t.truthy((await getCallCount(handler)) == 1);
 });
 
-test('should filter broadcasted events', t => {
+test('should filter broadcasted events', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const ownerID = TestData.getID();
   const deviceEvent = {
     broadcasted: true,
+    deviceID: TestData.getID(),
+    name: TEST_EVENT_NAME,
+    userID: ownerID,
+  };
+
+  const deviceEventNotBroadcasted = {
+    broadcasted: false,
     deviceID: TestData.getID(),
     name: TEST_EVENT_NAME,
     userID: ownerID,
@@ -150,11 +163,12 @@ test('should filter broadcasted events', t => {
   });
 
   eventPublisher.publish(deviceEvent, { isPublic: false });
+  eventPublisher.publish(deviceEventNotBroadcasted, { isPublic: false });
 
-  return checkIfCalled(false, handler);
+  t.truthy((await getCallCount(handler)) == 1);
 });
 
-test('should listen for mydevices events only', t => {
+test('should listen for mydevices events only', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const ownerID = TestData.getID();
@@ -185,17 +199,13 @@ test('should listen for mydevices events only', t => {
   });
 
   eventPublisher.publish(myDevicePublicEvent, { isPublic: true });
+  t.truthy((await getCallCount(handler)) == 1);
 
   eventPublisher.publish(myDevicesPrivateEvent, { isPublic: false });
+  t.truthy((await getCallCount(handler)) == 2);
 
   eventPublisher.publish(anotherOwnerPublicEvent, { isPublic: true });
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (handler.callCount !== 2)
-        return reject('Callcount incorrect ' + handler.callCount);
-      resolve();
-    }, 100);
-  });
+  t.truthy((await getCallCount(handler)) == 2);
 });
 
 /*
