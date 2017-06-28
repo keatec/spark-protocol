@@ -121,9 +121,10 @@ class Handshake {
       const logInfo = {
         cache_key: this._device && this._device._connectionKey,
         deviceID: this._deviceID || null,
-        ip: this._socket && this._socket.remoteAddress
-          ? this._socket.remoteAddress.toString()
-          : 'unknown',
+        ip:
+          this._socket && this._socket.remoteAddress
+            ? this._socket.remoteAddress.toString()
+            : 'unknown',
       };
 
       logger.error('Handshake failed: ', error, logInfo);

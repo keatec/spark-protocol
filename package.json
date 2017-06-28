@@ -21,7 +21,7 @@
     "postinstall": "npm run update-firmware",
     "prettify": "prettier --single-quote --trailing-comma all --write src/*/**.js test/*/**.js",
     "start": "babel ./src --out-dir ./dist --watch",
-    "test": "ava",
+    "test": "ava --no-cache",
     "test:watch": "ava --watch",
     "update-firmware": "node ./dist/scripts/update-firmware-binaries"
   },
@@ -38,7 +38,6 @@
     ]
   },
   "pre-commit": [
-    "lint-staged",
     "test"
   ],
   "ava": {

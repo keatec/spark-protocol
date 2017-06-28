@@ -59,9 +59,10 @@ class EventPublisher extends EventEmitter {
 
   publish = (eventData: EventData, options: PublishOptions) => {
     const { isInternal, isPublic } = options || {};
-    const ttl = eventData.ttl && eventData.ttl > 0
-      ? eventData.ttl
-      : settings.DEFAULT_EVENT_TTL;
+    const ttl =
+      eventData.ttl && eventData.ttl > 0
+        ? eventData.ttl
+        : settings.DEFAULT_EVENT_TTL;
 
     const event: Event = {
       ...eventData,
@@ -151,9 +152,7 @@ class EventPublisher extends EventEmitter {
           timeoutHandler();
         }
       }, subscriptionTimeout);
-      this.once(eventNamePrefix, () => {
-        clearTimeout(timeout);
-      });
+      this.once(eventNamePrefix, (): void => clearTimeout(timeout));
     }
 
     if (once) {
@@ -168,9 +167,7 @@ class EventPublisher extends EventEmitter {
   };
 
   unsubscribe = (subscriptionID: string) => {
-    const subscription: Subscription = this._subscriptionsByID.get(
-      subscriptionID,
-    );
+    const subscription = this._subscriptionsByID.get(subscriptionID);
     if (!subscription) {
       return;
     }
