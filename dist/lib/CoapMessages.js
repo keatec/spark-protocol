@@ -77,6 +77,8 @@ var _logger2 = _interopRequireDefault(_logger);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+var logger = _logger2.default.createModuleLogger(module);
+
 var _getRouteKey = function _getRouteKey(code, path) {
   var uri = code + path;
   var idx = uri.indexOf('/');
@@ -189,7 +191,7 @@ function (_ref) {
   try {
     var specification = CoapMessages._specifications.get(messageName);
     if (!specification) {
-      _logger2.default.error('Unknown Message Type');
+      logger.error({ messageName: messageName }, 'Unknown Message Type');
       return null;
     }
 
@@ -232,7 +234,7 @@ function (_ref) {
       token: token && Buffer.from([token])
     }));
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'Coap Error');
   }
   return null;
 }, _class.unwrap = function (data) {
@@ -243,7 +245,7 @@ function (_ref) {
   try {
     return _coapPacket2.default.parse(data);
   } catch (error) {
-    _logger2.default.error('Coap Error: ' + error);
+    logger.error({ err: error }, 'Coap Error');
   }
 
   return null;
@@ -294,7 +296,7 @@ function (_ref) {
 
     default:
       {
-        _logger2.default.error('asked for unknown type: ' + typeInt);
+        logger.error({ typeInt: typeInt }, 'asked for unknown type');
         throw new Error('error getNameFromTypeInt: ' + typeInt);
       }
   }
@@ -303,7 +305,7 @@ function (_ref) {
   try {
     result = CoapMessages.fromBinary(buffer, typeName);
   } catch (error) {
-    _logger2.default.error('Could not parse type: ' + typeName + ' ' + buffer.toString() + ' ' + error);
+    logger.error({ buffer: buffer.toString(), err: error, typeName: typeName }, 'Could not parse type');
   }
   return result;
 }, _class.fromBinary = function (buffer, typeName) {

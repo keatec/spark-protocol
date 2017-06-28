@@ -1,5 +1,7 @@
 // @flow
 
+import bunyan from 'bunyan';
+
 export type DeviceAttributes = {
   appHash: ?string,
   claimCode?: ?string,
@@ -56,8 +58,8 @@ export type ServerKeyRepository = {
 };
 
 export type PublishOptions = {
-  isInternal: boolean,
-  isPublic: boolean,
+  isInternal?: boolean,
+  isPublic?: boolean,
 };
 
 export interface IBaseRepository<TModel> {
@@ -71,5 +73,10 @@ export interface IBaseRepository<TModel> {
 export interface IDeviceAttributeRepository
   extends IBaseRepository<DeviceAttributes> {}
 
-export interface IDeviceKeyRepository
-  extends IBaseRepository<DeviceKeyObject> {}
+export interface IDeviceKeyRepository extends IBaseRepository<DeviceKeyObject> {
+}
+
+export interface ILoggerCreate {
+  static createLogger(applicationName: string): bunyan.Logger,
+  static createModuleLogger(applicationModule: any): bunyan.Logger,
+}

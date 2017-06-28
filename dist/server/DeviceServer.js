@@ -36,10 +36,6 @@ var _Handshake = require('../lib/Handshake');
 
 var _Handshake2 = _interopRequireDefault(_Handshake);
 
-var _chalk = require('chalk');
-
-var _chalk2 = _interopRequireDefault(_chalk);
-
 var _net = require('net');
 
 var _net2 = _interopRequireDefault(_net);
@@ -68,10 +64,6 @@ var _FirmwareManager = require('../lib/FirmwareManager');
 
 var _FirmwareManager2 = _interopRequireDefault(_FirmwareManager);
 
-var _logger = require('../lib/logger');
-
-var _logger2 = _interopRequireDefault(_logger);
-
 var _CoapMessages = require('../lib/CoapMessages');
 
 var _CoapMessages2 = _interopRequireDefault(_CoapMessages);
@@ -82,27 +74,35 @@ var _SparkServerEvents = require('../lib/SparkServerEvents');
 
 var _SparkServerEvents2 = _interopRequireDefault(_SparkServerEvents);
 
+var _logger = require('../lib/logger');
+
+var _logger2 = _interopRequireDefault(_logger);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var NAME_GENERATOR = _moniker2.default.generator([_moniker2.default.adjective, _moniker2.default.noun]); /*
-                                                                                                         *   Copyright (c) 2015 Particle Industries, Inc.  All rights reserved.
-                                                                                                         *
-                                                                                                         *   This program is free software; you can redistribute it and/or
-                                                                                                         *   modify it under the terms of the GNU Lesser General Public
-                                                                                                         *   License as published by the Free Software Foundation, either
-                                                                                                         *   version 3 of the License, or (at your option) any later version.
-                                                                                                         *
-                                                                                                         *   This program is distributed in the hope that it will be useful,
-                                                                                                         *   but WITHOUT ANY WARRANTY; without even the implied warranty of
-                                                                                                         *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-                                                                                                         *   Lesser General Public License for more details.
-                                                                                                         *
-                                                                                                         *   You should have received a copy of the GNU Lesser General Public
-                                                                                                         *   License along with this program; if not, see <http://www.gnu.org/licenses/>.
-                                                                                                         *
-                                                                                                         * 
-                                                                                                         *
-                                                                                                         */
+/*
+*   Copyright (c) 2015 Particle Industries, Inc.  All rights reserved.
+*
+*   This program is free software; you can redistribute it and/or
+*   modify it under the terms of the GNU Lesser General Public
+*   License as published by the Free Software Foundation, either
+*   version 3 of the License, or (at your option) any later version.
+*
+*   This program is distributed in the hope that it will be useful,
+*   but WITHOUT ANY WARRANTY; without even the implied warranty of
+*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+*   Lesser General Public License for more details.
+*
+*   You should have received a copy of the GNU Lesser General Public
+*   License along with this program; if not, see <http://www.gnu.org/licenses/>.
+*
+* 
+*
+*/
+
+var logger = _logger2.default.createModuleLogger(module);
+
+var NAME_GENERATOR = _moniker2.default.generator([_moniker2.default.adjective, _moniker2.default.noun]);
 
 var SPECIAL_EVENTS = [_Device.SYSTEM_EVENT_NAMES.APP_HASH, _Device.SYSTEM_EVENT_NAMES.FLASH_AVAILABLE, _Device.SYSTEM_EVENT_NAMES.FLASH_PROGRESS, _Device.SYSTEM_EVENT_NAMES.FLASH_STATUS, _Device.SYSTEM_EVENT_NAMES.SAFE_MODE, _Device.SYSTEM_EVENT_NAMES.SPARK_STATUS];
 
@@ -198,7 +198,11 @@ var DeviceServer = function () {
                 deviceID = _context7.sent;
 
 
-                _logger2.default.info('Connection from: ' + device.getRemoteIPAddress() + ' - ' + ('Device ID: ' + deviceID), 'Connection ID: ' + counter);
+                logger.info({
+                  connectionID: counter,
+                  deviceID: deviceID,
+                  remoteIPAddress: device.getRemoteIPAddress()
+                }, 'Connection');
 
                 process.nextTick((0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee6() {
                   var existingConnection, systemInformation, _FirmwareManager$getA, appHash, existingAttributes, _ref8, claimCode, currentBuildTarget, imei, isCellular, last_iccid, name, ownerID, registrar;
@@ -305,7 +309,7 @@ var DeviceServer = function () {
                           if (_this._devicesById.has(deviceID)) {
                             existingConnection = _this._devicesById.get(deviceID);
 
-                            (0, _nullthrows9.default)(existingConnection).disconnect('Device was already connected. Reconnecting.\r\n');
+                            (0, _nullthrows9.default)(existingConnection).disconnect('Device was already connected. Reconnecting.');
                           }
 
                           _this._devicesById.set(deviceID, device);
@@ -377,7 +381,7 @@ var DeviceServer = function () {
                 _context7.prev = 13;
                 _context7.t0 = _context7['catch'](0);
 
-                _logger2.default.error('Device startup failed: ' + _context7.t0.message);
+                logger.error({ err: _context7.t0 }, 'Device startup failed');
 
               case 16:
               case 'end':
@@ -427,7 +431,10 @@ var DeviceServer = function () {
               case 11:
 
                 _this.publishSpecialEvent(_Device.SYSTEM_EVENT_NAMES.SPARK_STATUS, 'offline', deviceID, ownerID, false);
-                _logger2.default.warn('Session ended for device with ID: ' + deviceID + ' with connectionKey: ' + ('' + (connectionKey || 'no connection key')));
+                logger.warn({
+                  connectionKey: connectionKey,
+                  deviceID: deviceID
+                }, 'Session ended for Device');
 
               case 13:
               case 'end':
@@ -572,7 +579,7 @@ var DeviceServer = function () {
                 _context9.prev = 28;
                 _context9.t0 = _context9['catch'](0);
 
-                _logger2.default.error(_context9.t0);
+                logger.error({ err: _context9.t0 }, 'Error');
 
               case 31:
               case 'end':
@@ -683,17 +690,20 @@ var DeviceServer = function () {
 
               case 11:
 
-                _logger2.default.log('Subscribe Request:\r\n', {
+                logger.info({
                   deviceID: deviceID,
                   isFromMyDevices: isFromMyDevices,
                   messageName: messageName
-                });
+                }, 'Subscribe Request');
 
                 device.sendReply('SubscribeAck', packet.messageId);
 
                 process.nextTick(function () {
                   if (!ownerID) {
-                    _logger2.default.log('device with ID ' + deviceID + ' wasn\'t subscribed to ' + (messageName + ' event: the device is unclaimed.'));
+                    logger.info({
+                      deviceID: deviceID,
+                      messageName: messageName
+                    }, 'device wasnt subscribed to event: the device is unclaimed.');
                     ownerID = '--unclaimed--';
                   }
 
@@ -1218,17 +1228,17 @@ var DeviceServer = function () {
 
       setInterval(function () {
         return server.getConnections(function (error, count) {
-          _logger2.default.info('Connected Devices ' + _chalk2.default.green(_this2._devicesById.size), ' - Sockets ' + _chalk2.default.green(count) + ' ');
+          logger.info({ devices: _this2._devicesById.size, sockets: count }, 'Connected Devices');
         });
       }, 10000);
 
       server.on('error', function (error) {
-        return _logger2.default.error('something blew up ' + error.message);
+        return logger.error({ err: error }, 'something blew up');
       });
 
       var serverPort = this._config.PORT.toString();
       server.listen(serverPort, function () {
-        return _logger2.default.log('Server started on port: ' + serverPort);
+        return logger.info({ serverPort: serverPort }, 'Server started');
       });
     }
   }]);

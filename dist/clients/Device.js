@@ -69,10 +69,6 @@ var _events = require('events');
 
 var _events2 = _interopRequireDefault(_events);
 
-var _logger = require('../lib/logger');
-
-var _logger2 = _interopRequireDefault(_logger);
-
 var _nullthrows = require('nullthrows');
 
 var _nullthrows2 = _interopRequireDefault(_nullthrows);
@@ -81,7 +77,33 @@ var _settings = require('../settings');
 
 var _settings2 = _interopRequireDefault(_settings);
 
+var _logger = require('../lib/logger');
+
+var _logger2 = _interopRequireDefault(_logger);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/*
+*   Copyright (c) 2015 Particle Industries, Inc.  All rights reserved.
+*
+*   This program is free software; you can redistribute it and/or
+*   modify it under the terms of the GNU Lesser General Public
+*   License as published by the Free Software Foundation, either
+*   version 3 of the License, or (at your option) any later version.
+*
+*   This program is distributed in the hope that it will be useful,
+*   but WITHOUT ANY WARRANTY; without even the implied warranty of
+*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+*   Lesser General Public License for more .
+*
+*   You should have received a copy of the GNU Lesser General Public
+*   License along with this program; if not, see <http://www.gnu.org/licenses/>.
+*
+* 
+*
+*/
+
+var logger = _logger2.default.createModuleLogger(module);
 
 // Hello — sent first by Device then by Server immediately after handshake, never again
 // Ignored — sent by either side to respond to a message with a bad counter value.
@@ -111,26 +133,6 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
  * How high do our counters go before we wrap around to 0?
  * (CoAP maxes out at a 16 bit int)
  */
-/*
-*   Copyright (c) 2015 Particle Industries, Inc.  All rights reserved.
-*
-*   This program is free software; you can redistribute it and/or
-*   modify it under the terms of the GNU Lesser General Public
-*   License as published by the Free Software Foundation, either
-*   version 3 of the License, or (at your option) any later version.
-*
-*   This program is distributed in the hope that it will be useful,
-*   but WITHOUT ANY WARRANTY; without even the implied warranty of
-*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*   Lesser General Public License for more .
-*
-*   You should have received a copy of the GNU Lesser General Public
-*   License along with this program; if not, see <http://www.gnu.org/licenses/>.
-*
-* 
-*
-*/
-
 var COUNTER_MAX = 65536;
 /**
  * How big can our tokens be in CoAP messages?
@@ -441,14 +443,14 @@ var Device = function (_EventEmitter) {
 
               _this.setStatus(DEVICE_STATUS_MAP.GOT_DESCRIPTION);
 
-              _logger2.default.log('On device protocol initialization complete:\r\n', {
+              logger.info({
                 cache_key: _this._connectionKey,
                 deviceID: _this.getDeviceID(),
                 firmwareVersion: _this._attributes.productFirmwareVersion,
                 ip: _this.getRemoteIPAddress(),
                 platformID: _this._attributes.platformId,
                 productID: _this._attributes.particleProductId
-              });
+              }, 'On device protocol initialization complete');
 
               return _context4.abrupt('return', _systemInformation);
 
@@ -495,7 +497,7 @@ var Device = function (_EventEmitter) {
           reservedFlags: payload.readUInt16BE(4)
         };
       } catch (error) {
-        _logger2.default.log('error while parsing hello payload ', error);
+        logger.error({ err: error }, 'error while parsing hello payload ');
         return null;
       }
     };
@@ -508,7 +510,7 @@ var Device = function (_EventEmitter) {
 
     _this.ping = function () {
       if (_settings2.default.logApiMessages) {
-        _logger2.default.log('Pinged, replying', { deviceID: _this.getDeviceID() });
+        logger.info({ deviceID: _this.getDeviceID() }, 'Pinged, replying');
       }
 
       return {
@@ -521,9 +523,9 @@ var Device = function (_EventEmitter) {
       var packet = _CoapMessages2.default.unwrap(data);
 
       if (!packet) {
-        _logger2.default.error('routeMessage got a NULL coap message ', {
+        logger.error({
           deviceID: _this.getDeviceID()
-        });
+        }, ' routeMessage got a NULL coap message ');
         return;
       }
 
@@ -563,7 +565,11 @@ var Device = function (_EventEmitter) {
       }
 
       if (!packet || packet.messageId !== _this._receiveCounter) {
-        _logger2.default.log('got counter ', packet.messageId, ' expecting ', _this._receiveCounter, { deviceID: _this.getDeviceID() });
+        logger.warn({
+          deviceID: _this.getDeviceID(),
+          expect: _this._receiveCounter,
+          got: packet.messageId
+        }, 'MessageId other than expected');
 
         if (requestType === 'Ignored') {
           // don't ignore an ignore...
@@ -581,7 +587,7 @@ var Device = function (_EventEmitter) {
 
     _this.sendReply = function (messageName, id, data, token, requester) {
       if (!_this._isSocketAvailable(requester || null, messageName)) {
-        _logger2.default.error('This client has an exclusive lock.');
+        logger.error({ messageName: messageName }, 'This client has an exclusive lock.');
         return;
       }
 
@@ -596,16 +602,16 @@ var Device = function (_EventEmitter) {
 
       var message = _CoapMessages2.default.wrap(messageName, id, null, null, data, token);
       if (!message) {
-        _logger2.default.error('Device - could not unwrap message', {
+        logger.error({
           deviceID: _this.getDeviceID()
-        });
+        }, 'Device - could not unwrap message');
         return;
       }
 
       if (!_this._cipherStream) {
-        _logger2.default.error('Device - sendReply before READY', {
+        logger.error({
           deviceID: _this.getDeviceID()
-        });
+        }, 'Device - sendReply before READY');
         return;
       }
       _this._cipherStream.write(message);
@@ -613,7 +619,7 @@ var Device = function (_EventEmitter) {
 
     _this.sendMessage = function (messageName, params, options, data, requester) {
       if (!_this._isSocketAvailable(requester, messageName)) {
-        _logger2.default.error('This client has an exclusive lock.');
+        logger.error({ messageName: messageName }, 'This client has an exclusive lock.');
         return -1;
       }
 
@@ -630,15 +636,15 @@ var Device = function (_EventEmitter) {
       var message = _CoapMessages2.default.wrap(messageName, _this._sendCounter, params, options, data, token);
 
       if (!message) {
-        _logger2.default.error('Could not wrap message', messageName, params, data);
+        logger.error({ data: data, messageName: messageName, params: params }, 'Could not wrap message');
         return -1;
       }
 
       if (!_this._cipherStream) {
-        _logger2.default.error('Client - sendMessage before READY', {
+        logger.error({
           deviceID: _this.getDeviceID(),
           messageName: messageName
-        });
+        }, 'Client - sendMessage before READY');
       }
 
       process.nextTick(function () {
@@ -669,9 +675,11 @@ var Device = function (_EventEmitter) {
                     var packetUri = _CoapMessages2.default.getUriPath(packet);
                     if (uri && packetUri.indexOf(uri) !== 0) {
                       if (beVerbose) {
-                        _logger2.default.log('URI filter did not match', uri, packetUri, {
-                          deviceID: _this.getDeviceID()
-                        });
+                        logger.warn({
+                          deviceID: _this.getDeviceID(),
+                          packetUri: packetUri,
+                          uri: uri
+                        }, 'URI filter did not match');
                       }
                       return;
                     }
@@ -679,9 +687,11 @@ var Device = function (_EventEmitter) {
                     var packetTokenHex = packet.token.toString('hex');
                     if (tokenHex && tokenHex !== packetTokenHex) {
                       if (beVerbose) {
-                        _logger2.default.log('Tokens did not match ', tokenHex, packetTokenHex, {
-                          deviceID: _this.getDeviceID()
-                        });
+                        logger.warn({
+                          deviceID: _this.getDeviceID(),
+                          packetTokenHex: packetTokenHex,
+                          tokenHex: tokenHex
+                        }, 'Tokens did not match');
                       }
                       return;
                     }
@@ -844,10 +854,10 @@ var Device = function (_EventEmitter) {
 
               case 7:
 
-                _logger2.default.log('sending function call to the device', {
+                logger.info({
                   deviceID: _this.getDeviceID(),
                   functionName: functionName
-                });
+                }, 'sending function call to the device');
 
                 token = _this.sendMessage('FunctionCall', {
                   args: (0, _values2.default)(functionArguments),
@@ -944,9 +954,9 @@ var Device = function (_EventEmitter) {
                 flasher = new _Flasher2.default(_this, _this._maxBinarySize, _this._otaChunkSize);
                 _context9.prev = 4;
 
-                _logger2.default.log('flash device started! - sending api event', {
+                logger.info({
                   deviceID: _this.getDeviceID()
-                });
+                }, 'flash device started! - sending api event');
 
                 _this.emit(DEVICE_EVENT_NAMES.FLASH_STARTED);
 
@@ -955,9 +965,9 @@ var Device = function (_EventEmitter) {
 
               case 9:
 
-                _logger2.default.log('flash device finished! - sending api event', {
+                logger.info({
                   deviceID: _this.getDeviceID()
-                });
+                }, 'flash device finished! - sending api event');
 
                 _this.emit(DEVICE_EVENT_NAMES.FLASH_SUCCESS);
 
@@ -967,10 +977,10 @@ var Device = function (_EventEmitter) {
                 _context9.prev = 14;
                 _context9.t0 = _context9['catch'](4);
 
-                _logger2.default.log('flash device failed! - sending api event', {
+                logger.info({
                   deviceID: _this.getDeviceID(),
                   error: _context9.t0
-                });
+                }, 'flash device failed! - sending api event');
 
                 _this.emit(DEVICE_EVENT_NAMES.FLASH_FAILED);
                 throw new Error('Update failed: ' + _context9.t0.message);
@@ -993,18 +1003,18 @@ var Device = function (_EventEmitter) {
         return true;
       }
 
-      _logger2.default.error('This client has an exclusive lock', {
+      logger.error({
         cache_key: _this._connectionKey,
         deviceID: _this.getDeviceID(),
         messageName: messageName
-      });
+      }, 'This client has an exclusive lock');
 
       return false;
     };
 
     _this.takeOwnership = function (flasher) {
       if (_this._owningFlasher) {
-        _logger2.default.error('already owned', { deviceID: _this.getDeviceID() });
+        logger.error({ deviceID: _this.getDeviceID() }, 'already owned');
         return false;
       }
       // only permit the owning object to send messages.
@@ -1013,11 +1023,11 @@ var Device = function (_EventEmitter) {
     };
 
     _this.releaseOwnership = function (flasher) {
-      _logger2.default.log('releasing flash ownership ', { deviceID: _this.getDeviceID() });
+      logger.info({ deviceID: _this.getDeviceID() }, 'releasing flash ownership ');
       if (_this._owningFlasher === flasher) {
         _this._owningFlasher = null;
       } else if (_this._owningFlasher) {
-        _logger2.default.error('cannot releaseOwnership, ', flasher, " isn't the current owner ", { deviceID: _this.getDeviceID() });
+        logger.error({ deviceID: _this.getDeviceID(), flasher: flasher }, "cannot releaseOwnership, isn't  current owner");
       }
     };
 
@@ -1033,7 +1043,7 @@ var Device = function (_EventEmitter) {
           result = _CoapMessages2.default.fromBinary(packet.payload, variableType);
         }
       } catch (error) {
-        _logger2.default.error('_transformVariableResult - error transforming response: ' + error);
+        logger.error({ err: error }, '_transformVariableResult - error transforming response');
       }
 
       return result;
@@ -1048,7 +1058,7 @@ var Device = function (_EventEmitter) {
           result = _CoapMessages2.default.fromBinary(packet.payload, variableType);
         }
       } catch (error) {
-        _logger2.default.error('_transformFunctionResult - error transforming response: ' + error);
+        logger.error({ err: error }, '_transformFunctionResult - error transforming response');
         throw error;
       }
 
@@ -1199,9 +1209,13 @@ var Device = function (_EventEmitter) {
           duration: _this._connectionStartTime ? (new Date() - _this._connectionStartTime) / 1000.0 : undefined
         };
 
-        _logger2.default.error(_this._disconnectCounter + ' : Device disconnected: ' + (message || ''), logInfo);
+        logger.error({
+          disconnectCounter: _this._disconnectCounter,
+          logInfo: logInfo,
+          message: message
+        }, 'Device disconnected');
       } catch (error) {
-        _logger2.default.error('Disconnect log error ' + error);
+        logger.error({ err: error }, 'Disconnect log error');
       }
 
       if (_this._decipherStream) {
@@ -1209,7 +1223,7 @@ var Device = function (_EventEmitter) {
           _this._decipherStream.end();
           _this._decipherStream = null;
         } catch (error) {
-          _logger2.default.error('Error cleaning up decipherStream: ' + error);
+          logger.error({ err: error }, 'Error cleaning up decipherStream');
         }
       }
 
@@ -1218,7 +1232,7 @@ var Device = function (_EventEmitter) {
           _this._cipherStream.end();
           _this._cipherStream = null;
         } catch (error) {
-          _logger2.default.error('Error cleaning up cipherStream: ' + error);
+          logger.error({ err: error }, 'Error cleaning up cipherStream');
         }
       }
 
@@ -1226,7 +1240,7 @@ var Device = function (_EventEmitter) {
         _this._socket.end();
         _this._socket.destroy();
       } catch (error) {
-        _logger2.default.error('Disconnect TCPSocket error: ' + error);
+        logger.error({ err: error }, 'Disconnect TCPSocket error');
       }
 
       _this.emit(DEVICE_EVENT_NAMES.DISCONNECT, message);
@@ -1235,7 +1249,7 @@ var Device = function (_EventEmitter) {
       try {
         _this.removeAllListeners();
       } catch (error) {
-        _logger2.default.error('Problem removing listeners ' + error);
+        logger.error({ err: error }, 'Problem removing listeners');
       }
     };
 

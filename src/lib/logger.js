@@ -1,73 +1,23 @@
-/*
-*   Copyright (C) 2013-2014 Spark Labs, Inc. All rights reserved. -  https://www.spark.io/
-*
-*   This file is part of the Spark-protocol module
-*
-*   This program is free software: you can redistribute it and/or modify
-*   it under the terms of the GNU General Public License version 3
-*   as published by the Free Software Foundation.
-*
-*   Spark-protocol is distributed in the hope that it will be useful,
-*   but WITHOUT ANY WARRANTY; without even the implied warranty of
-*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*   GNU General Public License for more details.
-*
-*   You should have received a copy of the GNU General Public License
-*   along with Spark-protocol.  If not, see <http://www.gnu.org/licenses/>.
-*
-*   You can download the source here: https://github.com/spark/spark-protocol
-*
-* @flow
-*
-*/
+// @flow
 
-import { Container } from 'constitute';
-
-import chalk from 'chalk';
+import bunyan from 'bunyan';
+import { ILoggerCreate } from '../types';
+import path from 'path';
 import settings from '../settings';
 
-function isObject(obj: any): boolean {
-  return obj === Object(obj);
-}
-
-function _transform(...params: Array<any>): Array<any> {
-  return params.map((param: any): string => {
-    if (!isObject(param)) {
-      return param;
-    }
-
-    return JSON.stringify(param);
-  });
-}
-
-function getDate(): string {
-  return new Date().toISOString();
-}
-
-class Logger {
-  static container: Container;
-
-  static log(...params: Array<any>) {
-    if (settings.SHOW_VERBOSE_DEVICE_LOGS) {
-      Logger._log(`[${getDate()}]`, _transform(...params));
-    }
+export default class Logger implements ILoggerCreate {
+  static createLogger(applicationName: string): bunyan.Logger {
+    return bunyan.createLogger({
+      level: settings.LOG_LEVEL,
+      name: applicationName,
+      serializers: bunyan.stdSerializers,
+    });
   }
-
-  static info(...params: Array<any>) {
-    Logger._log(`[${getDate()}]`, chalk.cyan(_transform(...params)));
-  }
-
-  static warn(...params: Array<any>) {
-    Logger._log(`[${getDate()}]`, chalk.yellow(_transform(...params)));
-  }
-
-  static error(...params: Array<any>) {
-    Logger._log(`[${getDate()}]`, chalk.red(_transform(...params)));
-  }
-
-  static _log(...params: Array<any>): Function {
-    return Logger.container.constitute('LOGGING_FUNCTION')(...params);
+  static createModuleLogger(applicationModule: any): bunyan.Logger {
+    return bunyan.createLogger({
+      level: settings.LOG_LEVEL,
+      name: path.basename(applicationModule.filename),
+      serializers: bunyan.stdSerializers,
+    });
   }
 }
-
-export default Logger;
