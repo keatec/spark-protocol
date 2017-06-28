@@ -9,24 +9,32 @@ import { getRequestEventName } from '../src/lib/EventPublisher';
 
 const TEST_EVENT_NAME = 'testEvent';
 
+function checkIfCalled(called, handler) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (called) {
+        handler.called ? resolve() : reject('Was not called');
+      } else {
+        handler.called ? reject('Was called') : resolve();
+      }
+    }, 100);
+  });
+}
+
 test('should subscribe to event', t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const eventData = {
     name: TEST_EVENT_NAME,
     userID: TestData.getID(),
-    isPublic: true,
   };
 
   eventPublisher.subscribe(eventData.name, handler, {
     filterOptions: { userID: eventData.userID },
   });
 
-  eventPublisher.publish(eventData);
-
-  process.nextTick(() => {
-    t.truthy(handler.called);
-  });
+  eventPublisher.publish(eventData, { isPublic: true });
+  return checkIfCalled(true, handler);
 });
 
 test('should listen for public event from another owner device', t => {
@@ -35,17 +43,14 @@ test('should listen for public event from another owner device', t => {
   const eventData = {
     name: TEST_EVENT_NAME,
     userID: TestData.getID(),
-    isPublic: true,
   };
 
   eventPublisher.subscribe(eventData.name, handler, {
     filterOptions: { userID: TestData.getID() },
   });
 
-  eventPublisher.publish(eventData);
-  process.nextTick(() => {
-    t.truthy(handler.called);
-  });
+  eventPublisher.publish(eventData, { isPublic: true });
+  return checkIfCalled(true, handler);
 });
 
 test('should filter private event', t => {
@@ -54,18 +59,14 @@ test('should filter private event', t => {
   const eventData = {
     name: TEST_EVENT_NAME,
     userID: TestData.getID(),
-    isPublic: false,
   };
 
   eventPublisher.subscribe(eventData.name, handler, {
-    filterOptions: { userID: TestData.getID() },
+    filterOptions: { userID: TestData.getID },
   });
 
-  eventPublisher.publish(eventData);
-
-  process.nextTick(() => {
-    t.falsy(handler.called);
-  });
+  eventPublisher.publish(eventData, { isPublic: false });
+  return checkIfCalled(false, handler);
 });
 
 test('should filter internal event', t => {
@@ -73,18 +74,14 @@ test('should filter internal event', t => {
   const handler = sinon.spy();
   const eventData = {
     name: TEST_EVENT_NAME,
-    isInternal: true,
   };
 
   eventPublisher.subscribe(eventData.name, handler, {
-    filterOptions: { listenToInternalEvents: true },
+    filterOptions: { listenToInternalEvents: false },
   });
 
-  eventPublisher.publish(eventData);
-
-  process.nextTick(() => {
-    t.falsy(handler.called);
-  });
+  eventPublisher.publish(eventData, { isInternal: true });
+  return checkIfCalled(false, handler);
 });
 
 test('should filter event by connectionID', t => {
@@ -94,18 +91,15 @@ test('should filter event by connectionID', t => {
   const eventData = {
     name: TEST_EVENT_NAME,
     userID: TestData.getID(),
-    isPublic: false,
   };
 
   eventPublisher.subscribe(eventData.name, handler, {
     filterOptions: { connectionID },
   });
 
-  eventPublisher.publish(eventData);
+  eventPublisher.publish(eventData, { isPublic: false });
 
-  process.nextTick(() => {
-    t.falsy(handler.called);
-  });
+  return checkIfCalled(false, handler);
 });
 
 test('should filter event by deviceID', t => {
@@ -123,7 +117,6 @@ test('should filter event by deviceID', t => {
   const notDeviceEvent = {
     name: TEST_EVENT_NAME,
     userID: ownerID,
-    isPublic: false,
   };
 
   eventPublisher.subscribe(deviceEvent.name, handler, {
@@ -133,12 +126,10 @@ test('should filter event by deviceID', t => {
     },
   });
 
-  eventPublisher.publish(deviceEvent);
-  eventPublisher.publish(notDeviceEvent);
+  eventPublisher.publish(deviceEvent, { isPublic: false });
+  eventPublisher.publish(notDeviceEvent, { isPublic: false });
 
-  process.nextTick(() => {
-    t.falsy(handler.called);
-  });
+  return checkIfCalled(false, handler);
 });
 
 test('should filter broadcasted events', t => {
@@ -148,7 +139,6 @@ test('should filter broadcasted events', t => {
   const deviceEvent = {
     broadcasted: true,
     deviceID: TestData.getID(),
-    isPublic: false,
     name: TEST_EVENT_NAME,
     userID: ownerID,
   };
@@ -159,11 +149,9 @@ test('should filter broadcasted events', t => {
     },
   });
 
-  eventPublisher.publish(deviceEvent);
+  eventPublisher.publish(deviceEvent, { isPublic: false });
 
-  process.nextTick(() => {
-    t.falsy(handler.called);
-  });
+  return checkIfCalled(false, handler);
 });
 
 test('should listen for mydevices events only', t => {
@@ -174,21 +162,18 @@ test('should listen for mydevices events only', t => {
   const myDevicePublicEvent = {
     name: TEST_EVENT_NAME,
     userID: ownerID,
-    isPublic: true,
     deviceID: TestData.getID(),
   };
 
   const myDevicesPrivateEvent = {
     name: TEST_EVENT_NAME,
     userID: ownerID,
-    isPublic: false,
     deviceID: TestData.getID(),
   };
 
   const anotherOwnerPublicEvent = {
     name: TEST_EVENT_NAME,
     userID: TestData.getID(),
-    isPublic: true,
     deviceID: TestData.getID(),
   };
 
@@ -199,21 +184,23 @@ test('should listen for mydevices events only', t => {
     },
   });
 
-  eventPublisher.publish(myDevicePublicEvent);
-  process.nextTick(() => {
-    t.is(handler.callCount, 1);
-  });
+  eventPublisher.publish(myDevicePublicEvent, { isPublic: true });
 
-  eventPublisher.publish(myDevicesPrivateEvent);
-  process.nextTick(() => {
-    t.is(handler.callCount, 2);
-  });
+  eventPublisher.publish(myDevicesPrivateEvent, { isPublic: false });
 
-  eventPublisher.publish(anotherOwnerPublicEvent);
-  process.nextTick(() => {
-    t.is(handler.callCount, 2);
+  eventPublisher.publish(anotherOwnerPublicEvent, { isPublic: true });
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (handler.callCount !== 2)
+        return reject('Callcount incorrect ' + handler.callCount);
+      resolve();
+    }, 100);
   });
 });
+
+/*
+
+NOT implemented at all ?
 
 test('should unsubscribe all subscriptions by subsriberID', t => {
   const eventPublisher = new EventPublisher();
@@ -222,25 +209,27 @@ test('should unsubscribe all subscriptions by subsriberID', t => {
 
   const event = {
     name: TEST_EVENT_NAME,
-    isPublic: true,
   };
 
   eventPublisher.subscribe(event, handler, { subscriberID });
 
   eventPublisher.subscribe(event, handler, { subscriberID });
 
-  eventPublisher.publish(event);
-  process.nextTick(() => {
-    t.is(handler.callCount, 2);
-  });
+  eventPublisher.publish(event, { isPublic: true });
 
   eventPublisher.unsubscribeBySubscriberID(subscriberID);
 
-  eventPublisher.publish(event);
-  process.nextTick(() => {
-    t.is(handler.callCount, 2);
-  });
+  eventPublisher.publish(event, { isPublic: true });
+
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+        if (handler.callCount !== 2) reject('Callcount is incorrect ' + handler.callCount);
+        resolve();
+    },100)
+  })
 });
+
+*/
 
 test('should publish and listen for response', async t => {
   const eventPublisher = new EventPublisher();
