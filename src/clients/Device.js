@@ -32,9 +32,10 @@ import FileTransferStore from '../lib/FileTransferStore';
 import CoapMessages from '../lib/CoapMessages';
 import Flasher from '../lib/Flasher';
 import EventEmitter from 'events';
-import logger from '../lib/logger';
 import nullthrows from 'nullthrows';
 import settings from '../settings';
+import Logger from '../lib/logger';
+const logger = Logger.createModuleLogger(module);
 
 type DeviceDescription = {|
   functionState: Object,
@@ -319,14 +320,17 @@ class Device extends EventEmitter {
 
       this.setStatus(DEVICE_STATUS_MAP.GOT_DESCRIPTION);
 
-      logger.log('On device protocol initialization complete:\r\n', {
-        cache_key: this._connectionKey,
-        deviceID: this.getDeviceID(),
-        firmwareVersion: this._attributes.productFirmwareVersion,
-        ip: this.getRemoteIPAddress(),
-        platformID: this._attributes.platformId,
-        productID: this._attributes.particleProductId,
-      });
+      logger.info(
+        {
+          cache_key: this._connectionKey,
+          deviceID: this.getDeviceID(),
+          firmwareVersion: this._attributes.productFirmwareVersion,
+          ip: this.getRemoteIPAddress(),
+          platformID: this._attributes.platformId,
+          productID: this._attributes.particleProductId,
+        },
+        'On device protocol initialization complete',
+      );
 
       return systemInformation;
     } catch (error) {
@@ -369,7 +373,7 @@ class Device extends EventEmitter {
         reservedFlags: payload.readUInt16BE(4),
       };
     } catch (error) {
-      logger.log('error while parsing hello payload ', error);
+      logger.error({ err: error }, 'error while parsing hello payload ');
       return null;
     }
   };
@@ -385,7 +389,7 @@ class Device extends EventEmitter {
     lastHeard: ?Date,
   } => {
     if (settings.logApiMessages) {
-      logger.log('Pinged, replying', { deviceID: this.getDeviceID() });
+      logger.info({ deviceID: this.getDeviceID() }, 'Pinged, replying');
     }
 
     return {
@@ -402,9 +406,12 @@ class Device extends EventEmitter {
     const packet = CoapMessages.unwrap(data);
 
     if (!packet) {
-      logger.error('routeMessage got a NULL coap message ', {
-        deviceID: this.getDeviceID(),
-      });
+      logger.error(
+        {
+          deviceID: this.getDeviceID(),
+        },
+        ' routeMessage got a NULL coap message ',
+      );
       return;
     }
 
@@ -447,12 +454,13 @@ class Device extends EventEmitter {
     }
 
     if (!packet || packet.messageId !== this._receiveCounter) {
-      logger.log(
-        'got counter ',
-        packet.messageId,
-        ' expecting ',
-        this._receiveCounter,
-        { deviceID: this.getDeviceID() },
+      logger.warn(
+        {
+          deviceID: this.getDeviceID(),
+          expect: this._receiveCounter,
+          got: packet.messageId,
+        },
+        'MessageId other than expected',
       );
 
       if (requestType === 'Ignored') {
@@ -477,7 +485,7 @@ class Device extends EventEmitter {
     requester: ?Object,
   ) => {
     if (!this._isSocketAvailable(requester || null, messageName)) {
-      logger.error('This client has an exclusive lock.');
+      logger.error({ messageName }, 'This client has an exclusive lock.');
       return;
     }
 
@@ -492,16 +500,22 @@ class Device extends EventEmitter {
 
     const message = CoapMessages.wrap(messageName, id, null, null, data, token);
     if (!message) {
-      logger.error('Device - could not unwrap message', {
-        deviceID: this.getDeviceID(),
-      });
+      logger.error(
+        {
+          deviceID: this.getDeviceID(),
+        },
+        'Device - could not unwrap message',
+      );
       return;
     }
 
     if (!this._cipherStream) {
-      logger.error('Device - sendReply before READY', {
-        deviceID: this.getDeviceID(),
-      });
+      logger.error(
+        {
+          deviceID: this.getDeviceID(),
+        },
+        'Device - sendReply before READY',
+      );
       return;
     }
     this._cipherStream.write(message);
@@ -515,7 +529,7 @@ class Device extends EventEmitter {
     requester?: Object,
   ): number => {
     if (!this._isSocketAvailable(requester, messageName)) {
-      logger.error('This client has an exclusive lock.');
+      logger.error({ messageName }, 'This client has an exclusive lock.');
       return -1;
     }
 
@@ -539,15 +553,18 @@ class Device extends EventEmitter {
     );
 
     if (!message) {
-      logger.error('Could not wrap message', messageName, params, data);
+      logger.error({ data, messageName, params }, 'Could not wrap message');
       return -1;
     }
 
     if (!this._cipherStream) {
-      logger.error('Client - sendMessage before READY', {
-        deviceID: this.getDeviceID(),
-        messageName,
-      });
+      logger.error(
+        {
+          deviceID: this.getDeviceID(),
+          messageName,
+        },
+        'Client - sendMessage before READY',
+      );
     }
 
     process.nextTick(
@@ -582,9 +599,14 @@ class Device extends EventEmitter {
           const packetUri = CoapMessages.getUriPath(packet);
           if (uri && packetUri.indexOf(uri) !== 0) {
             if (beVerbose) {
-              logger.log('URI filter did not match', uri, packetUri, {
-                deviceID: this.getDeviceID(),
-              });
+              logger.warn(
+                {
+                  deviceID: this.getDeviceID(),
+                  packetUri,
+                  uri,
+                },
+                'URI filter did not match',
+              );
             }
             return;
           }
@@ -592,9 +614,14 @@ class Device extends EventEmitter {
           const packetTokenHex = packet.token.toString('hex');
           if (tokenHex && tokenHex !== packetTokenHex) {
             if (beVerbose) {
-              logger.log('Tokens did not match ', tokenHex, packetTokenHex, {
-                deviceID: this.getDeviceID(),
-              });
+              logger.warn(
+                {
+                  deviceID: this.getDeviceID(),
+                  packetTokenHex,
+                  tokenHex,
+                },
+                'Tokens did not match',
+              );
             }
             return;
           }
@@ -707,10 +734,13 @@ class Device extends EventEmitter {
       throw new Error('Function not found');
     }
 
-    logger.log('sending function call to the device', {
-      deviceID: this.getDeviceID(),
-      functionName,
-    });
+    logger.info(
+      {
+        deviceID: this.getDeviceID(),
+        functionName,
+      },
+      'sending function call to the device',
+    );
 
     const token = this.sendMessage('FunctionCall', {
       args: Object.values(functionArguments),
@@ -760,26 +790,35 @@ class Device extends EventEmitter {
 
     const flasher = new Flasher(this, this._maxBinarySize, this._otaChunkSize);
     try {
-      logger.log('flash device started! - sending api event', {
-        deviceID: this.getDeviceID(),
-      });
+      logger.info(
+        {
+          deviceID: this.getDeviceID(),
+        },
+        'flash device started! - sending api event',
+      );
 
       this.emit(DEVICE_EVENT_NAMES.FLASH_STARTED);
 
       await flasher.startFlashBuffer(binary, fileTransferStore, address);
 
-      logger.log('flash device finished! - sending api event', {
-        deviceID: this.getDeviceID(),
-      });
+      logger.info(
+        {
+          deviceID: this.getDeviceID(),
+        },
+        'flash device finished! - sending api event',
+      );
 
       this.emit(DEVICE_EVENT_NAMES.FLASH_SUCCESS);
 
       return { status: 'Update finished' };
     } catch (error) {
-      logger.log('flash device failed! - sending api event', {
-        deviceID: this.getDeviceID(),
-        error,
-      });
+      logger.info(
+        {
+          deviceID: this.getDeviceID(),
+          error,
+        },
+        'flash device failed! - sending api event',
+      );
 
       this.emit(DEVICE_EVENT_NAMES.FLASH_FAILED);
       throw new Error(`Update failed: ${error.message}`);
@@ -791,18 +830,21 @@ class Device extends EventEmitter {
       return true;
     }
 
-    logger.error('This client has an exclusive lock', {
-      cache_key: this._connectionKey,
-      deviceID: this.getDeviceID(),
-      messageName,
-    });
+    logger.error(
+      {
+        cache_key: this._connectionKey,
+        deviceID: this.getDeviceID(),
+        messageName,
+      },
+      'This client has an exclusive lock',
+    );
 
     return false;
   };
 
   takeOwnership = (flasher: Flasher): boolean => {
     if (this._owningFlasher) {
-      logger.error('already owned', { deviceID: this.getDeviceID() });
+      logger.error({ deviceID: this.getDeviceID() }, 'already owned');
       return false;
     }
     // only permit the owning object to send messages.
@@ -811,15 +853,13 @@ class Device extends EventEmitter {
   };
 
   releaseOwnership = (flasher: Flasher) => {
-    logger.log('releasing flash ownership ', { deviceID: this.getDeviceID() });
+    logger.info({ deviceID: this.getDeviceID() }, 'releasing flash ownership ');
     if (this._owningFlasher === flasher) {
       this._owningFlasher = null;
     } else if (this._owningFlasher) {
       logger.error(
-        'cannot releaseOwnership, ',
-        flasher,
-        " isn't the current owner ",
-        { deviceID: this.getDeviceID() },
+        { deviceID: this.getDeviceID(), flasher },
+        "cannot releaseOwnership, isn't  current owner",
       );
     }
   };
@@ -839,7 +879,8 @@ class Device extends EventEmitter {
       }
     } catch (error) {
       logger.error(
-        `_transformVariableResult - error transforming response: ${error}`,
+        { err: error },
+        `_transformVariableResult - error transforming response`,
       );
     }
 
@@ -857,7 +898,8 @@ class Device extends EventEmitter {
       }
     } catch (error) {
       logger.error(
-        `_transformFunctionResult - error transforming response: ${error}`,
+        { err: error },
+        `_transformFunctionResult - error transforming response`,
       );
       throw error;
     }
@@ -1008,11 +1050,15 @@ class Device extends EventEmitter {
       };
 
       logger.error(
-        `${this._disconnectCounter} : Device disconnected: ${message || ''}`,
-        logInfo,
+        {
+          disconnectCounter: this._disconnectCounter,
+          logInfo,
+          message,
+        },
+        'Device disconnected',
       );
     } catch (error) {
-      logger.error(`Disconnect log error ${error}`);
+      logger.error({ err: error }, 'Disconnect log error');
     }
 
     if (this._decipherStream) {
@@ -1020,7 +1066,7 @@ class Device extends EventEmitter {
         this._decipherStream.end();
         this._decipherStream = null;
       } catch (error) {
-        logger.error(`Error cleaning up decipherStream: ${error}`);
+        logger.error({ err: error }, 'Error cleaning up decipherStream');
       }
     }
 
@@ -1029,7 +1075,7 @@ class Device extends EventEmitter {
         this._cipherStream.end();
         this._cipherStream = null;
       } catch (error) {
-        logger.error(`Error cleaning up cipherStream: ${error}`);
+        logger.error({ err: error }, 'Error cleaning up cipherStream');
       }
     }
 
@@ -1037,7 +1083,7 @@ class Device extends EventEmitter {
       this._socket.end();
       this._socket.destroy();
     } catch (error) {
-      logger.error(`Disconnect TCPSocket error: ${error}`);
+      logger.error({ err: error }, 'Disconnect TCPSocket error');
     }
 
     this.emit(DEVICE_EVENT_NAMES.DISCONNECT, message);
@@ -1046,7 +1092,7 @@ class Device extends EventEmitter {
     try {
       this.removeAllListeners();
     } catch (error) {
-      logger.error(`Problem removing listeners ${error}`);
+      logger.error({ err: error }, 'Problem removing listeners');
     }
   };
 }

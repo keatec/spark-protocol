@@ -28,12 +28,6 @@ var _logger2 = _interopRequireDefault(_logger);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-/**
- Our job here is to accept messages in whole chunks, and put their length in front
- as we send them out, and parse them back into those size chunks as we read them in.
- **/
-/* eslint-disable no-bitwise */
-
 /*
 *   Copyright (c) 2015 Particle Industries, Inc.  All rights reserved.
 *
@@ -53,6 +47,14 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 * 
 *
 */
+
+var logger = _logger2.default.createModuleLogger(module);
+
+/**
+ Our job here is to accept messages in whole chunks, and put their length in front
+ as we send them out, and parse them back into those size chunks as we read them in.
+ **/
+/* eslint-disable no-bitwise */
 
 var MSG_LENGTH_BYTES = 2;
 var messageLengthBytes = function messageLengthBytes(message) {
@@ -106,7 +108,10 @@ var ChunkingStream = function (_Transform) {
 
       if (startIndex < endIndex && _this._incomingBuffer) {
         if (_this._incomingIndex >= _this._incomingBuffer.length) {
-          _logger2.default.log("hmm, shouldn't end up here.");
+          logger.error({
+            incomingBuffer: _this._incomingBuffer.length,
+            incomingIndex: _this._incomingBuffer.length
+          }, "hmm, shouldn't end up here.");
         }
 
         chunk.copy(_this._incomingBuffer, _this._incomingIndex, startIndex, endIndex);
@@ -154,7 +159,7 @@ var ChunkingStream = function (_Transform) {
             return _this.process(buffer, callback);
           });
         } catch (error) {
-          _logger2.default.error('ChunkingStream error!: ' + error);
+          logger.error({ err: error }, 'ChunkingStream error!');
         }
       }
     };

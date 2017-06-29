@@ -42,10 +42,6 @@ var _ServerKeyFileRepository = require('./repository/ServerKeyFileRepository');
 
 var _ServerKeyFileRepository2 = _interopRequireDefault(_ServerKeyFileRepository);
 
-var _logger = require('./lib/logger');
-
-var _logger2 = _interopRequireDefault(_logger);
-
 var _settings = require('./settings');
 
 var _settings2 = _interopRequireDefault(_settings);
@@ -54,9 +50,6 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 var defaultBindings = function defaultBindings(container, serverSettings) {
   var mergedSettings = (0, _extends3.default)({}, _settings2.default, serverSettings);
-
-  container.bindValue('LOGGING_FUNCTION', console.log);
-  _logger2.default.container = container;
 
   // Settings
   container.bindValue('DEVICE_DIRECTORY', mergedSettings.DEVICE_DIRECTORY);
@@ -80,4 +73,5 @@ var defaultBindings = function defaultBindings(container, serverSettings) {
   // Device server
   container.bindClass('DeviceServer', _DeviceServer2.default, ['DeviceAttributeRepository', 'ClaimCodeManager', 'CryptoManager', 'EventPublisher', 'TCP_DEVICE_SERVER_CONFIG', 'ENABLE_SYSTEM_FIRWMARE_AUTOUPDATES']);
 };
+
 exports.default = defaultBindings;

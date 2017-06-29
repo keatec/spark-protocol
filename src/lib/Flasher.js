@@ -27,9 +27,9 @@ import ProtocolErrors from './ProtocolErrors';
 import FileTransferStore from './FileTransferStore';
 import CoapPacket from 'coap-packet';
 import crc32 from 'buffer-crc32';
-import logger from '../lib/logger';
 import nullthrows from 'nullthrows';
-
+import Logger from '../lib/logger';
+const logger = Logger.createModuleLogger(module);
 //
 // UpdateBegin — sent by Server to initiate an OTA firmware update
 // UpdateReady — sent by Device to indicate readiness to receive firmware chunks
@@ -72,17 +72,24 @@ class Flasher {
     address: string = '0x0',
   ): Promise<void> => {
     if (!buffer || buffer.length === 0) {
-      logger.log('flash failed! - file is empty! ', {
-        deviceID: this._client.getDeviceID(),
-      });
+      logger.error(
+        {
+          deviceID: this._client.getDeviceID(),
+        },
+        'flash failed! - file is empty! ',
+      );
 
       throw new Error('Update failed - File was empty!');
     }
 
     if (buffer && buffer.length > this._maxBinarySize) {
-      logger.log(`flash failed! - file is too BIG ${buffer.length}`, {
-        deviceID: this._client.getDeviceID(),
-      });
+      logger.error(
+        {
+          deviceID: this._client.getDeviceID(),
+          length: buffer.length,
+        },
+        'flash failed! - file is too BIG',
+      );
 
       throw new Error('Update failed - File was too big!');
     }
@@ -187,7 +194,7 @@ class Flasher {
 
             failReason = !Number.isNaN(failReason)
               ? ProtocolErrors.get(Number.parseInt(failReason, 10)) ||
-                failReason
+                  failReason
               : failReason;
 
             throw new Error(`aborted: ${failReason}`);
@@ -249,7 +256,7 @@ class Flasher {
     const destAddr = parseInt(address, 10);
 
     if (this._fastOtaEnabled) {
-      logger.log('fast ota enabled! ', this._getLogInfo());
+      logger.info({ logInfo: this._getLogInfo() }, 'fast ota enabled! ');
       flags = 1;
     }
 
@@ -284,9 +291,12 @@ class Flasher {
 
     const canUseFastOTA = this._fastOtaEnabled && this._protocolVersion > 0;
     if (canUseFastOTA) {
-      logger.log('Starting FastOTA update', {
-        deviceID: this._client.getDeviceID(),
-      });
+      logger.info(
+        {
+          deviceID: this._client.getDeviceID(),
+        },
+        'Starting FastOTA update',
+      );
     }
 
     this._readNextChunk();
@@ -304,7 +314,7 @@ class Flasher {
         messageToken,
       );
 
-      console.log(message);
+      logger.info({ message }, 'ChunkReceived');
 
       if (!CoapMessages.statusIsOkay(message)) {
         throw new Error("'ChunkReceived' failed.");
@@ -423,7 +433,7 @@ class Flasher {
 
     return new Promise((resolve: () => void): number =>
       setTimeout(() => {
-        logger.log('finished waiting');
+        logger.info('finished waiting');
         resolve();
       }, 3 * 1000),
     );
@@ -451,11 +461,14 @@ class Flasher {
     // if we're not doing a fast OTA, and ignore missed is turned on, then
     // ignore this missed chunk.
     if (!this._fastOtaEnabled && this._ignoreMissedChunks) {
-      logger.log('ignoring missed chunk ', this._getLogInfo());
+      logger.info({ logInfo: this._getLogInfo() }, 'ignoring missed chunk');
       return;
     }
 
-    logger.log('flasher - chunk missed - recovering ', this._getLogInfo());
+    logger.warn(
+      { logInfo: this._getLogInfo() },
+      'flasher - chunk missed - recovering ',
+    );
 
     // kosher if I ack before I've read the payload?
     this._client.sendReply(
@@ -472,7 +485,7 @@ class Flasher {
       try {
         this._missedChunks.add(payload.readtUInt16BE());
       } catch (error) {
-        logger.error(`onChunkMissed error reading payload: ${error}`);
+        logger.error({ err: error }, 'onChunkMissed error reading payload');
       }
     }
   };

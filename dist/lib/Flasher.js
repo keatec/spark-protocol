@@ -68,25 +68,15 @@ var _bufferCrc = require('buffer-crc32');
 
 var _bufferCrc2 = _interopRequireDefault(_bufferCrc);
 
-var _logger = require('../lib/logger');
-
-var _logger2 = _interopRequireDefault(_logger);
-
 var _nullthrows = require('nullthrows');
 
 var _nullthrows2 = _interopRequireDefault(_nullthrows);
 
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+var _logger = require('../lib/logger');
 
-//
-// UpdateBegin — sent by Server to initiate an OTA firmware update
-// UpdateReady — sent by Device to indicate readiness to receive firmware chunks
-// Chunk — sent by Server to send chunks of a firmware binary to Device
-// ChunkReceived — sent by Device to respond to each chunk, indicating the CRC of
-// the received chunk data.  if Server receives CRC that does not match the chunk just sent,
-// that chunk is sent again
-// UpdateDone — sent by Server to indicate all firmware chunks have been sent
-//
+var _logger2 = _interopRequireDefault(_logger);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /*
 *   Copyright (c) 2015 Particle Industries, Inc.  All rights reserved.
@@ -107,6 +97,17 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 * 
 *
 */
+
+var logger = _logger2.default.createModuleLogger(module);
+//
+// UpdateBegin — sent by Server to initiate an OTA firmware update
+// UpdateReady — sent by Device to indicate readiness to receive firmware chunks
+// Chunk — sent by Server to send chunks of a firmware binary to Device
+// ChunkReceived — sent by Device to respond to each chunk, indicating the CRC of
+// the received chunk data.  if Server receives CRC that does not match the chunk just sent,
+// that chunk is sent again
+// UpdateDone — sent by Server to indicate all firmware chunks have been sent
+//
 
 var CHUNK_SIZE = 256;
 var MAX_MISSED_CHUNKS = 10;
@@ -142,9 +143,9 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
                 break;
               }
 
-              _logger2.default.log('flash failed! - file is empty! ', {
+              logger.error({
                 deviceID: _this._client.getDeviceID()
-              });
+              }, 'flash failed! - file is empty! ');
 
               throw new Error('Update failed - File was empty!');
 
@@ -154,9 +155,10 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
                 break;
               }
 
-              _logger2.default.log('flash failed! - file is too BIG ' + buffer.length, {
-                deviceID: _this._client.getDeviceID()
-              });
+              logger.error({
+                deviceID: _this._client.getDeviceID(),
+                length: buffer.length
+              }, 'flash failed! - file is too BIG');
 
               throw new Error('Update failed - File was too big!');
 
@@ -383,7 +385,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
     var destAddr = parseInt(address, 10);
 
     if (_this._fastOtaEnabled) {
-      _logger2.default.log('fast ota enabled! ', _this._getLogInfo());
+      logger.info({ logInfo: _this._getLogInfo() }, 'fast ota enabled! ');
       flags = 1;
     }
 
@@ -412,9 +414,9 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
             canUseFastOTA = _this._fastOtaEnabled && _this._protocolVersion > 0;
 
             if (canUseFastOTA) {
-              _logger2.default.log('Starting FastOTA update', {
+              logger.info({
                 deviceID: _this._client.getDeviceID()
-              });
+              }, 'Starting FastOTA update');
             }
 
             _this._readNextChunk();
@@ -445,7 +447,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
             message = _context4.sent;
 
 
-            console.log(message);
+            logger.info({ message: message }, 'ChunkReceived');
 
             if (_CoapMessages2.default.statusIsOkay(message)) {
               _context4.next = 16;
@@ -570,7 +572,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
 
   this._readNextChunk = function () {
     if (!_this._fileStream) {
-      _logger2.default.error('Asked to read a chunk after the update was finished');
+      logger.error('Asked to read a chunk after the update was finished');
     }
 
     var chunk = _this._chunk = _this._fileStream ? _this._fileStream.read(_this._chunkSize) : null;
@@ -651,7 +653,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
           case 2:
             return _context8.abrupt('return', new _promise2.default(function (resolve) {
               return setTimeout(function () {
-                _logger2.default.log('finished waiting');
+                logger.info('finished waiting');
                 resolve();
               }, 3 * 1000);
             }));
@@ -684,11 +686,11 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
     // if we're not doing a fast OTA, and ignore missed is turned on, then
     // ignore this missed chunk.
     if (!_this._fastOtaEnabled && _this._ignoreMissedChunks) {
-      _logger2.default.log('ignoring missed chunk ', _this._getLogInfo());
+      logger.info({ logInfo: _this._getLogInfo() }, 'ignoring missed chunk');
       return;
     }
 
-    _logger2.default.log('flasher - chunk missed - recovering ', _this._getLogInfo());
+    logger.warn({ logInfo: _this._getLogInfo() }, 'flasher - chunk missed - recovering ');
 
     // kosher if I ack before I've read the payload?
     _this._client.sendReply('ChunkMissedAck', packet.messageId, null, null, _this);
@@ -699,7 +701,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
       try {
         _this._missedChunks.add(payload.readtUInt16BE());
       } catch (error) {
-        _logger2.default.error('onChunkMissed error reading payload: ' + error);
+        logger.error({ err: error }, 'onChunkMissed error reading payload');
       }
     }
   };

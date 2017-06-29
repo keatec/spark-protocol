@@ -31,7 +31,8 @@ import CoapMessage from './CoapMessage';
 import MessageSpecifications from './MessageSpecifications';
 import CoapPacket from 'coap-packet';
 import compactArray from 'compact-array';
-import logger from '../lib/logger';
+import Logger from '../lib/logger';
+const logger = Logger.createModuleLogger(module);
 
 const _getRouteKey = (code: number, path: string): string => {
   const uri = code + path;
@@ -171,7 +172,7 @@ class CoapMessages {
     try {
       const specification = CoapMessages._specifications.get(messageName);
       if (!specification) {
-        logger.error('Unknown Message Type');
+        logger.error({ messageName }, 'Unknown Message Type');
         return null;
       }
 
@@ -218,7 +219,7 @@ class CoapMessages {
         token: token && Buffer.from([token]),
       });
     } catch (error) {
-      console.error(error);
+      logger.error({ err: error }, 'Coap Error');
     }
     return null;
   };
@@ -231,7 +232,7 @@ class CoapMessages {
     try {
       return CoapPacket.parse(data);
     } catch (error) {
-      logger.error(`Coap Error: ${error}`);
+      logger.error({ err: error }, 'Coap Error');
     }
 
     return null;
@@ -289,7 +290,7 @@ class CoapMessages {
       }
 
       default: {
-        logger.error(`asked for unknown type: ${typeInt}`);
+        logger.error({ typeInt }, 'asked for unknown type');
         throw new Error(`error getNameFromTypeInt: ${typeInt}`);
       }
     }
@@ -302,7 +303,8 @@ class CoapMessages {
       result = CoapMessages.fromBinary(buffer, typeName);
     } catch (error) {
       logger.error(
-        `Could not parse type: ${typeName} ${buffer.toString()} ${error}`,
+        { buffer: buffer.toString(), err: error, typeName },
+        'Could not parse type',
       );
     }
     return result;

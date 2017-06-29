@@ -26,13 +26,13 @@ var _crypto = require('crypto');
 
 var _crypto2 = _interopRequireDefault(_crypto);
 
-var _logger = require('../lib/logger');
-
-var _logger2 = _interopRequireDefault(_logger);
-
 var _settings = require('../settings');
 
 var _settings2 = _interopRequireDefault(_settings);
+
+var _logger = require('../lib/logger');
+
+var _logger2 = _interopRequireDefault(_logger);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -56,6 +56,8 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 *
 */
 
+var logger = _logger2.default.createModuleLogger(module);
+
 var CryptoStream = function (_Transform) {
   (0, _inherits3.default)(CryptoStream, _Transform);
 
@@ -66,7 +68,7 @@ var CryptoStream = function (_Transform) {
 
     _this._transform = function (chunk, encoding, callback) {
       if (!chunk.length) {
-        _logger2.default.error("CryptoStream transform error: Chunk didn't have any length");
+        logger.error({ length: chunk.length }, "CryptoStream transform error: Chunk didn't have any length");
         callback();
         return;
       }
@@ -86,7 +88,7 @@ var CryptoStream = function (_Transform) {
 
         _this.push(output);
       } catch (error) {
-        _logger2.default.error('CryptoStream transform error: ' + error);
+        logger.error({ err: error }, 'CryptoStream transform error');
       }
       callback();
     };

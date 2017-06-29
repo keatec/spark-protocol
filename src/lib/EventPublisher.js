@@ -59,10 +59,9 @@ class EventPublisher extends EventEmitter {
 
   publish = (eventData: EventData, options: PublishOptions) => {
     const { isInternal, isPublic } = options || {};
-    const ttl =
-      eventData.ttl && eventData.ttl > 0
-        ? eventData.ttl
-        : settings.DEFAULT_EVENT_TTL;
+    const ttl = eventData.ttl && eventData.ttl > 0
+      ? eventData.ttl
+      : settings.DEFAULT_EVENT_TTL;
 
     const event: Event = {
       ...eventData,

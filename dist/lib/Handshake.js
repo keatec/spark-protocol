@@ -28,12 +28,33 @@ var _ChunkingStream = require('./ChunkingStream');
 
 var _ChunkingStream2 = _interopRequireDefault(_ChunkingStream);
 
-var _logger = require('./logger');
+var _logger = require('../lib/logger');
 
 var _logger2 = _interopRequireDefault(_logger);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+/*
+*   Copyright (c) 2015 Particle Industries, Inc.  All rights reserved.
+*
+*   This program is free software; you can redistribute it and/or
+*   modify it under the terms of the GNU Lesser General Public
+*   License as published by the Free Software Foundation, either
+*   version 3 of the License, or (at your option) any later version.
+*
+*   This program is distributed in the hope that it will be useful,
+*   but WITHOUT ANY WARRANTY; without even the implied warranty of
+*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+*   Lesser General Public License for more details.
+*
+*   You should have received a copy of the GNU Lesser General Public
+*   License along with this program; if not, see <http://www.gnu.org/licenses/>.
+*
+* 
+*
+*/
+
+var logger = _logger2.default.createModuleLogger(module);
 /*
  Handshake protocol v1
 
@@ -92,26 +113,6 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
  After the max uint32, the next message should set the counter to zero.
 */
 
-/*
-*   Copyright (c) 2015 Particle Industries, Inc.  All rights reserved.
-*
-*   This program is free software; you can redistribute it and/or
-*   modify it under the terms of the GNU Lesser General Public
-*   License as published by the Free Software Foundation, either
-*   version 3 of the License, or (at your option) any later version.
-*
-*   This program is distributed in the hope that it will be useful,
-*   but WITHOUT ANY WARRANTY; without even the implied warranty of
-*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*   Lesser General Public License for more details.
-*
-*   You should have received a copy of the GNU Lesser General Public
-*   License along with this program; if not, see <http://www.gnu.org/licenses/>.
-*
-* 
-*
-*/
-
 var NONCE_BYTES = 40;
 var ID_BYTES = 12;
 var SESSION_BYTES = 40;
@@ -140,7 +141,7 @@ var Handshake = function Handshake(cryptoManager) {
                   ip: _this._socket && _this._socket.remoteAddress ? _this._socket.remoteAddress.toString() : 'unknown'
                 };
 
-                _logger2.default.error('Handshake failed: ', error, logInfo);
+                logger.error({ err: error, logInfo: logInfo }, 'Handshake failed');
 
                 throw error;
               }));
@@ -240,14 +241,13 @@ var Handshake = function Handshake(cryptoManager) {
           var _data = _this._socket.read();
 
           if (!_data) {
-            _logger2.default.log('onSocketData called, but no data sent.');
+            logger.error('onSocketData called, but no data sent.');
             reject(new Error('onSocketData called, but no data sent.'));
           }
 
           resolve(_data);
         } catch (error) {
-          _logger2.default.log('Handshake: Exception thrown while processing data');
-          _logger2.default.error(error);
+          logger.error({ err: error }, 'Handshake: Exception thrown while processing data');
           reject(error);
         }
 
@@ -350,7 +350,7 @@ var Handshake = function Handshake(cryptoManager) {
       var lines = ['-----BEGIN PUBLIC KEY-----'].concat((0, _toConsumableArray3.default)(bufferString.match(/.{1,64}/g) || []), ['-----END PUBLIC KEY-----']);
       return lines.join('\n');
     } catch (error) {
-      _logger2.default.error('error converting DER to PEM, was: ' + bufferString + ' ' + error);
+      logger.error({ bufferString: bufferString, err: error }, 'error converting DER to PEM');
     }
     return null;
   };
@@ -393,7 +393,7 @@ var Handshake = function Handshake(cryptoManager) {
                 break;
               }
 
-              _logger2.default.error('\n        TODO: KEY PASSED TO DEVICE DURING HANDSHAKE DOESN\'T MATCH SAVED\n        PUBLIC KEY');
+              logger.error('TODO: KEY PASSED TO DEVICE DURING HANDSHAKE DOESNT MATCH SAVED PUBLIC KEY');
 
               _context5.next = 13;
               return _this._cryptoManager.createDevicePublicKey(deviceID, deviceProvidedPem);

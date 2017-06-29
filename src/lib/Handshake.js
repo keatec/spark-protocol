@@ -26,8 +26,8 @@ import type CryptoStream from './CryptoStream';
 import type CryptoManager from './CryptoManager';
 
 import ChunkingStream from './ChunkingStream';
-import logger from './logger';
-
+import Logger from '../lib/logger';
+const logger = Logger.createModuleLogger(module);
 /*
  Handshake protocol v1
 
@@ -121,13 +121,12 @@ class Handshake {
       const logInfo = {
         cache_key: this._device && this._device._connectionKey,
         deviceID: this._deviceID || null,
-        ip:
-          this._socket && this._socket.remoteAddress
-            ? this._socket.remoteAddress.toString()
-            : 'unknown',
+        ip: this._socket && this._socket.remoteAddress
+          ? this._socket.remoteAddress.toString()
+          : 'unknown',
       };
 
-      logger.error('Handshake failed: ', error, logInfo);
+      logger.error({ err: error, logInfo }, 'Handshake failed');
 
       throw error;
     });
@@ -191,14 +190,16 @@ class Handshake {
             const data = ((this._socket.read(): any): Buffer);
 
             if (!data) {
-              logger.log('onSocketData called, but no data sent.');
+              logger.error('onSocketData called, but no data sent.');
               reject(new Error('onSocketData called, but no data sent.'));
             }
 
             resolve(data);
           } catch (error) {
-            logger.log('Handshake: Exception thrown while processing data');
-            logger.error(error);
+            logger.error(
+              { err: error },
+              'Handshake: Exception thrown while processing data',
+            );
             reject(error);
           }
 
@@ -292,9 +293,7 @@ class Handshake {
       ];
       return lines.join('\n');
     } catch (error) {
-      logger.error(
-        `error converting DER to PEM, was: ${bufferString} ${error}`,
-      );
+      logger.error({ bufferString, err: error }, 'error converting DER to PEM');
     }
     return null;
   };
@@ -318,9 +317,7 @@ class Handshake {
 
     if (!publicKey.equals(deviceProvidedPem)) {
       logger.error(
-        `
-        TODO: KEY PASSED TO DEVICE DURING HANDSHAKE DOESN'T MATCH SAVED
-        PUBLIC KEY`,
+        'TODO: KEY PASSED TO DEVICE DURING HANDSHAKE DOESNT MATCH SAVED PUBLIC KEY',
       );
 
       return await this._cryptoManager.createDevicePublicKey(

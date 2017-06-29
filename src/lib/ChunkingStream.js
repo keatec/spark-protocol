@@ -19,7 +19,8 @@
 */
 
 import { Transform } from 'stream';
-import logger from '../lib/logger';
+import Logger from '../lib/logger';
+const logger = Logger.createModuleLogger(module);
 
 /**
  Our job here is to accept messages in whole chunks, and put their length in front
@@ -84,7 +85,13 @@ class ChunkingStream extends Transform {
 
     if (startIndex < endIndex && this._incomingBuffer) {
       if (this._incomingIndex >= this._incomingBuffer.length) {
-        logger.log("hmm, shouldn't end up here.");
+        logger.error(
+          {
+            incomingBuffer: this._incomingBuffer.length,
+            incomingIndex: this._incomingBuffer.length,
+          },
+          "hmm, shouldn't end up here.",
+        );
       }
 
       chunk.copy(
@@ -139,7 +146,7 @@ class ChunkingStream extends Transform {
       try {
         process.nextTick((): void => this.process(buffer, callback));
       } catch (error) {
-        logger.error(`ChunkingStream error!: ${error}`);
+        logger.error({ err: error }, 'ChunkingStream error!');
       }
     }
   };
