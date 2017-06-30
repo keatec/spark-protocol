@@ -102,16 +102,15 @@ var EventPublisher = function (_EventEmitter) {
       args[_key] = arguments[_key];
     }
 
-    return _ret = (_temp = (_this = (0, _possibleConstructorReturn3.default)(this, (_ref = EventPublisher.__proto__ || (0, _getPrototypeOf2.default)(EventPublisher)).call.apply(_ref, [this].concat(args))), _this), _this._subscriptionsByID = new _map2.default(), _this.publish = function (eventData, options) {
-      var _ref2 = options || {},
-          isInternal = _ref2.isInternal,
-          isPublic = _ref2.isPublic;
+    return _ret = (_temp = (_this = (0, _possibleConstructorReturn3.default)(this, (_ref = EventPublisher.__proto__ || (0, _getPrototypeOf2.default)(EventPublisher)).call.apply(_ref, [this].concat(args))), _this), _this._subscriptionsByID = new _map2.default(), _this.publish = function (eventData) {
+      var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {
+        isInternal: false,
+        isPublic: false
+      };
 
       var ttl = eventData.ttl && eventData.ttl > 0 ? eventData.ttl : _settings2.default.DEFAULT_EVENT_TTL;
 
-      var event = (0, _extends3.default)({}, eventData, {
-        isInternal: isInternal,
-        isPublic: isPublic,
+      var event = (0, _extends3.default)({}, eventData, options, {
         publishedAt: new Date(),
         ttl: ttl
       });
@@ -121,7 +120,7 @@ var EventPublisher = function (_EventEmitter) {
         _this.emit('*', event);
       });
     }, _this.publishAndListenForResponse = function () {
-      var _ref3 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee(eventData) {
+      var _ref2 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee(eventData) {
         var eventID, requestEventName, responseEventName;
         return _regenerator2.default.wrap(function _callee$(_context) {
           while (1) {
@@ -162,8 +161,8 @@ var EventPublisher = function (_EventEmitter) {
         }, _callee, _this2);
       }));
 
-      return function (_x) {
-        return _ref3.apply(this, arguments);
+      return function (_x2) {
+        return _ref2.apply(this, arguments);
       };
     }(), _this.subscribe = function () {
       var eventNamePrefix = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '*';

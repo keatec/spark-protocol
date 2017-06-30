@@ -57,16 +57,20 @@ type Subscription = {
 class EventPublisher extends EventEmitter {
   _subscriptionsByID: Map<string, Subscription> = new Map();
 
-  publish = (eventData: EventData, options: PublishOptions) => {
-    const { isInternal, isPublic } = options || {};
+  publish = (
+    eventData: EventData,
+    options: ?PublishOptions = {
+      isInternal: false,
+      isPublic: false,
+    },
+  ) => {
     const ttl = eventData.ttl && eventData.ttl > 0
       ? eventData.ttl
       : settings.DEFAULT_EVENT_TTL;
 
     const event: Event = {
       ...eventData,
-      isInternal,
-      isPublic,
+      ...options,
       publishedAt: new Date(),
       ttl,
     };
@@ -81,9 +85,7 @@ class EventPublisher extends EventEmitter {
     eventData: EventData,
   ): Promise<Object> => {
     const eventID = uuid();
-    const requestEventName = `${getRequestEventName(
-      eventData.name,
-    )}/${eventID}`;
+    const requestEventName = `${getRequestEventName(eventData.name)}/${eventID}`;
     const responseEventName = `${eventData.name}/response/${eventID}`;
 
     return new Promise(
