@@ -7,15 +7,18 @@ import TestData from './setup/TestData';
 import EventPublisher from '../src/lib/EventPublisher';
 import { getRequestEventName } from '../src/lib/EventPublisher';
 
-const TEST_EVENT_NAME = 'testEvent';
+const delay = (milliseconds: number): Promise<void> =>
+  new Promise((resolve: () => void): void => setTimeout(resolve, milliseconds));
 
-var getCallCount = async (handler): Promise<number> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      resolve(handler.callCount);
-    }, 100);
-  });
-};
+// todo fix this if find better approach
+// we use delay to ensure events being published by eventPublisher
+// the method has its coveats, obvious one: hardcoded delay is bad.
+// and not obvious: we run tests in parallel so, if delay will be
+// too small but there is huge amount of tests, some of them could fail
+// because of that.
+const DELAY_TIME = 100;
+
+const TEST_EVENT_NAME = 'testEvent';
 
 test('should subscribe to event', async t => {
   const eventPublisher = new EventPublisher();
@@ -29,8 +32,10 @@ test('should subscribe to event', async t => {
     filterOptions: { userID: eventData.userID },
   });
 
-  eventPublisher.publish(eventData, { isPublic: true });
-  t.truthy((await getCallCount(handler)) == 1);
+  eventPublisher.publish(eventData);
+
+  await delay(DELAY_TIME);
+  t.truthy(handler.called);
 });
 
 test('should listen for public event from another owner device', async t => {
@@ -46,7 +51,9 @@ test('should listen for public event from another owner device', async t => {
   });
 
   eventPublisher.publish(eventData, { isPublic: true });
-  t.truthy((await getCallCount(handler)) == 1);
+
+  await delay(DELAY_TIME);
+  t.truthy(handler.called);
 });
 
 test('should filter private event', async t => {
@@ -58,12 +65,13 @@ test('should filter private event', async t => {
   };
 
   eventPublisher.subscribe(eventData.name, handler, {
-    filterOptions: { userID: TestData.getID },
+    filterOptions: { userID: TestData.getID() },
   });
 
   eventPublisher.publish(eventData, { isPublic: false });
 
-  t.truthy((await getCallCount(handler)) == 0);
+  await delay(DELAY_TIME);
+  t.falsy(handler.called);
 });
 
 test('should filter internal event', async t => {
@@ -78,14 +86,9 @@ test('should filter internal event', async t => {
   });
 
   eventPublisher.publish(eventData, { isInternal: true });
-  eventPublisher.publish(eventData, { isInternal: true, isPublic: true });
-  eventPublisher.publish(eventData, { isInternal: true, isPublic: false });
-  t.truthy((await getCallCount(handler)) == 0);
 
-  eventPublisher.publish(eventData, { isInternal: false });
-  eventPublisher.publish(eventData, { isInternal: false, isPublic: true });
-  eventPublisher.publish(eventData, { isInternal: false, isPublic: false });
-  t.truthy((await getCallCount(handler)) == 3);
+  await delay(DELAY_TIME);
+  t.falsy(handler.called);
 });
 
 test('should filter event by connectionID', async t => {
@@ -102,10 +105,9 @@ test('should filter event by connectionID', async t => {
   });
 
   eventPublisher.publish(eventData, { isPublic: false });
-  t.truthy((await getCallCount(handler)) == 0);
 
-  eventPublisher.publish(eventData, { isPublic: true });
-  t.truthy((await getCallCount(handler)) == 1);
+  await delay(DELAY_TIME);
+  t.falsy(handler.called);
 });
 
 test('should filter event by deviceID', async t => {
@@ -122,12 +124,11 @@ test('should filter event by deviceID', async t => {
   const notDeviceEvent = {
     name: TEST_EVENT_NAME,
     userID: ownerID,
-    deviceID: TestData.getID(),
   };
 
   eventPublisher.subscribe(deviceEvent.name, handler, {
     filterOptions: {
-      deviceID: deviceEvent.deviceID,
+      deviceID: TestData.getID(),
       userID: deviceEvent.userID,
     },
   });
@@ -135,7 +136,8 @@ test('should filter event by deviceID', async t => {
   eventPublisher.publish(deviceEvent, { isPublic: false });
   eventPublisher.publish(notDeviceEvent, { isPublic: false });
 
-  t.truthy((await getCallCount(handler)) == 1);
+  await delay(DELAY_TIME);
+  t.falsy(handler.called);
 });
 
 test('should filter broadcasted events', async t => {
@@ -149,13 +151,6 @@ test('should filter broadcasted events', async t => {
     userID: ownerID,
   };
 
-  const deviceEventNotBroadcasted = {
-    broadcasted: false,
-    deviceID: TestData.getID(),
-    name: TEST_EVENT_NAME,
-    userID: ownerID,
-  };
-
   eventPublisher.subscribe(deviceEvent.name, handler, {
     filterOptions: {
       listenToBroadcastedEvents: false,
@@ -163,9 +158,9 @@ test('should filter broadcasted events', async t => {
   });
 
   eventPublisher.publish(deviceEvent, { isPublic: false });
-  eventPublisher.publish(deviceEventNotBroadcasted, { isPublic: false });
 
-  t.truthy((await getCallCount(handler)) == 1);
+  await delay(DELAY_TIME);
+  t.falsy(handler.called);
 });
 
 test('should listen for mydevices events only', async t => {
@@ -199,20 +194,19 @@ test('should listen for mydevices events only', async t => {
   });
 
   eventPublisher.publish(myDevicePublicEvent, { isPublic: true });
-  t.truthy((await getCallCount(handler)) == 1);
+  await delay(DELAY_TIME);
+  t.is(handler.callCount, 1);
 
   eventPublisher.publish(myDevicesPrivateEvent, { isPublic: false });
-  t.truthy((await getCallCount(handler)) == 2);
+  await delay(DELAY_TIME);
+  t.is(handler.callCount, 2);
 
   eventPublisher.publish(anotherOwnerPublicEvent, { isPublic: true });
-  t.truthy((await getCallCount(handler)) == 2);
+  await delay(DELAY_TIME);
+  t.is(handler.callCount, 2);
 });
 
-/*
-
-NOT implemented at all ?
-
-test('should unsubscribe all subscriptions by subsriberID', t => {
+test.only('should unsubscribe all subscriptions by subsriberID', async t => {
   const eventPublisher = new EventPublisher();
   const handler = sinon.spy();
   const subscriberID = TestData.getID();
@@ -221,25 +215,21 @@ test('should unsubscribe all subscriptions by subsriberID', t => {
     name: TEST_EVENT_NAME,
   };
 
-  eventPublisher.subscribe(event, handler, { subscriberID });
+  eventPublisher.subscribe(event.name, handler, { subscriberID });
 
-  eventPublisher.subscribe(event, handler, { subscriberID });
+  eventPublisher.subscribe(event.name, handler, { subscriberID });
 
   eventPublisher.publish(event, { isPublic: true });
+
+  await delay(DELAY_TIME);
+  t.is(handler.callCount, 2);
 
   eventPublisher.unsubscribeBySubscriberID(subscriberID);
-
   eventPublisher.publish(event, { isPublic: true });
 
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-        if (handler.callCount !== 2) reject('Callcount is incorrect ' + handler.callCount);
-        resolve();
-    },100)
-  })
+  await delay(DELAY_TIME);
+  t.is(handler.callCount, 2);
 });
-
-*/
 
 test('should publish and listen for response', async t => {
   const eventPublisher = new EventPublisher();
