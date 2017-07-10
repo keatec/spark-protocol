@@ -227,7 +227,7 @@ var downloadAppBinaries = function () {
 }();
 
 (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee3() {
-  var releases, release, downloadedBinaries, settingsBinaries, specificationsResponse, versionResponse, versionText, data, mapping, line;
+  var releases, release, downloadedBinaries, settingsBinaries, specificationsResponse, versionResponse, versionText, mapping;
   return _regenerator2.default.wrap(function _callee3$(_context3) {
     while (1) {
       switch (_context3.prev = _context3.next) {
@@ -331,27 +331,36 @@ var downloadAppBinaries = function () {
         case 29:
           versionResponse = _context3.sent;
           versionText = new Buffer(versionResponse.content, 'base64').toString() || '';
-          data = versionText.match(/^\|[^\n]*/gim).map(function (line) {
+
+          if (versionText) {
+            _context3.next = 33;
+            break;
+          }
+
+          throw new Error('can\'t download system-versions file');
+
+        case 33:
+          mapping = (0, _nullthrows2.default)(versionText.match(/^\|[^\n]*/gim)).map(function (line) {
             return line.split('|').slice(2, 5);
           }).filter(function (arr) {
             return !isNaN(parseInt(arr[0], 10));
-          }).map(function (vdata) {
-            return [vdata[0].replace(/\s+/g, ''), vdata[1].replace(/\s+/g, '')];
+          }).map(function (versionData) {
+            return [versionData[0].replace(/\s+/g, ''), versionData[1].replace(/\s+/g, '')];
           });
 
-          if (data.length === 0) {
-            console.log('cant parse system-versions from https://github.com/spark/firmware/blob/develop/system/system-versions.md');
+          if (!(mapping.length === 0)) {
+            _context3.next = 36;
+            break;
           }
-          mapping = [];
 
-          for (line = 0; line < data.length; line += 1) {
-            mapping.push(data[line]);
-          }
+          throw new Error('cant parse system-versions from ' + 'https://github.com/spark/firmware/blob/develop/system/system-versions.md');
+
+        case 36:
           _fs2.default.writeFileSync(MAPPING_FILE, (0, _stringify2.default)(mapping, null, 2));
 
           console.log('\r\nCompleted Sync');
 
-        case 37:
+        case 38:
         case 'end':
           return _context3.stop();
       }

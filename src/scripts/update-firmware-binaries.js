@@ -236,22 +236,23 @@ const downloadAppBinaries = async (): Promise<*> => {
 
   const versionText =
     new Buffer(versionResponse.content, 'base64').toString() || '';
-  const data = versionText
-    .match(/^\|[^\n]*/gim)
+  if (!versionText) {
+    throw new Error("can't download system-versions file");
+  }
+
+  const mapping = nullthrows(versionText.match(/^\|[^\n]*/gim))
     .map((line: string): Array<string> => line.split('|').slice(2, 5))
     .filter((arr: Array<string>): boolean => !isNaN(parseInt(arr[0], 10)))
-    .map((vdata: Array<any>): Array => [
-      vdata[0].replace(/\s+/g, ''),
-      vdata[1].replace(/\s+/g, ''),
+    .map((versionData: Array<string>): Array<string> => [
+      versionData[0].replace(/\s+/g, ''),
+      versionData[1].replace(/\s+/g, ''),
     ]);
-  if (data.length === 0) {
-    console.log(
-      'cant parse system-versions from https://github.com/spark/firmware/blob/develop/system/system-versions.md',
+
+  if (mapping.length === 0) {
+    throw new Error(
+      'cant parse system-versions from ' +
+        'https://github.com/spark/firmware/blob/develop/system/system-versions.md',
     );
-  }
-  const mapping = [];
-  for (let line = 0; line < data.length; line += 1) {
-    mapping.push(data[line]);
   }
   fs.writeFileSync(MAPPING_FILE, JSON.stringify(mapping, null, 2));
 
