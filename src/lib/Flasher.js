@@ -455,7 +455,7 @@ class Flasher {
       setTimeout(() => {
         logger.info('finished waiting');
         resolve();
-      }, 3 * 1000),
+      }, 15 * 1000),
     );
   };
 
