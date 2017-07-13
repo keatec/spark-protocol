@@ -699,7 +699,12 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
       return;
     }
 
-    logger.warn({ logInfo: _this._getLogInfo() }, 'flasher - chunk missed - recovering ');
+    logger.warn({
+      chunkIndex: _this._chunkIndex,
+      logInfo: _this._getLogInfo(),
+      messageId: packet.messageId,
+      missedChunks: _this._missedChunks.size
+    }, 'flasher - chunk missed - recovering ');
 
     // kosher if I ack before I've read the payload?
     _this._client.sendReply('ChunkMissedAck', packet.messageId, null, null, _this);
