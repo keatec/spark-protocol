@@ -451,7 +451,7 @@ class Flasher {
         setTimeout((): void => res(), ms);
       });
     };
-    let waitCount: number = 10;
+    let waitCount: number = 30;
     while (waitCount > 0) {
       waitCount -= 1;
       if (this._missedChunks.size) {
