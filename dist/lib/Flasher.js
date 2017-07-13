@@ -191,27 +191,24 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
               }), _this._sendFile()]);
 
             case 15:
-              _context.next = 17;
-              return _this._onAllChunksDone();
 
-            case 17:
               _this._cleanup();
-              _context.next = 24;
+              _context.next = 22;
               break;
 
-            case 20:
-              _context.prev = 20;
+            case 18:
+              _context.prev = 18;
               _context.t0 = _context['catch'](6);
 
               _this._cleanup();
               throw _context.t0;
 
-            case 24:
+            case 22:
             case 'end':
               return _context.stop();
           }
         }
-      }, _callee, _this, [[6, 20]]);
+      }, _callee, _this, [[6, 18]]);
     }));
 
     return function (_x) {
@@ -234,7 +231,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
     _this._chunkIndex = -1;
 
     // start listening for missed chunks before the update fully begins
-    _this._client.on('msg_chunkmissed', function (packet) {
+    _this._client.on('ChunkMissed', function (packet) {
       return _this._onChunkMissed(packet);
     });
   };
@@ -462,37 +459,41 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
 
           case 18:
             if (!canUseFastOTA) {
-              _context4.next = 21;
+              _context4.next = 23;
               break;
             }
 
             _context4.next = 21;
-            return _this._waitForMissedChunks();
+            return _this._onAllChunksDone();
 
           case 21:
+            _context4.next = 23;
+            return _this._waitForMissedChunks();
+
+          case 23:
 
             // Handle missed chunks
             counter = 0;
 
-          case 22:
+          case 24:
             if (!(_this._missedChunks.size > 0 && counter < 3)) {
-              _context4.next = 30;
+              _context4.next = 32;
               break;
             }
 
-            _context4.next = 25;
+            _context4.next = 27;
             return _this._resendChunks();
 
-          case 25:
-            _context4.next = 27;
+          case 27:
+            _context4.next = 29;
             return _this._waitForMissedChunks();
 
-          case 27:
+          case 29:
             counter += 1;
-            _context4.next = 22;
+            _context4.next = 24;
             break;
 
-          case 30:
+          case 32:
           case 'end':
             return _context4.stop();
         }
@@ -651,6 +652,14 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
             return _context8.abrupt('return', null);
 
           case 2:
+            if (!_this._missedChunks.size) {
+              _context8.next = 4;
+              break;
+            }
+
+            return _context8.abrupt('return', _promise2.default.resolve());
+
+          case 4:
             return _context8.abrupt('return', new _promise2.default(function (resolve) {
               return setTimeout(function () {
                 logger.info('finished waiting');
@@ -658,7 +667,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
               }, 3 * 1000);
             }));
 
-          case 3:
+          case 5:
           case 'end':
             return _context8.stop();
         }
@@ -699,7 +708,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
     var payload = packet.payload;
     for (var ii = 0; ii < payload.length; ii += 2) {
       try {
-        _this._missedChunks.add(payload.readtUInt16BE());
+        _this._missedChunks.add(payload.readUInt16BE());
       } catch (error) {
         logger.error({ err: error }, 'onChunkMissed error reading payload');
       }

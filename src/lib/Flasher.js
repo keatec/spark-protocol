@@ -115,8 +115,6 @@ class Flasher {
         this._sendFile(),
       ]);
 
-      // cleanup
-      await this._onAllChunksDone();
       this._cleanup();
     } catch (error) {
       this._cleanup();
@@ -139,7 +137,7 @@ class Flasher {
     this._chunkIndex = -1;
 
     // start listening for missed chunks before the update fully begins
-    this._client.on('msg_chunkmissed', (packet: CoapPacket): void =>
+    this._client.on('ChunkMissed', (packet: CoapPacket): void =>
       this._onChunkMissed(packet),
     );
   };
@@ -322,6 +320,9 @@ class Flasher {
     }
 
     if (canUseFastOTA) {
+      // cleanup
+      await this._onAllChunksDone();
+
       // Wait a whle for the error messages to come in for FastOTA
       await this._waitForMissedChunks();
     }
@@ -431,6 +432,10 @@ class Flasher {
       return null;
     }
 
+    if (this._missedChunks.size) {
+      return Promise.resolve();
+    }
+
     return new Promise((resolve: () => void): number =>
       setTimeout(() => {
         logger.info('finished waiting');
@@ -483,7 +488,7 @@ class Flasher {
     const payload = packet.payload;
     for (let ii = 0; ii < payload.length; ii += 2) {
       try {
-        this._missedChunks.add(payload.readtUInt16BE());
+        this._missedChunks.add(payload.readUInt16BE());
       } catch (error) {
         logger.error({ err: error }, 'onChunkMissed error reading payload');
       }

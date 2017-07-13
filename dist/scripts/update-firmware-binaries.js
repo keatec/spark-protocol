@@ -337,7 +337,7 @@ var downloadAppBinaries = function () {
             break;
           }
 
-          throw new Error('can\'t download system-versions file');
+          throw new Error("can't download system-versions file");
 
         case 33:
           mapping = (0, _nullthrows2.default)(versionText.match(/^\|[^\n]*/gim)).map(function (line) {
