@@ -351,7 +351,7 @@ class Flasher {
         const messageToken = this._sendChunk(chunkIndex);
 
         // We don't need to wait for the response if using FastOTA.
-        if (!canUseFastOTA) {
+        if (canUseFastOTA) {
           return;
         }
 
@@ -431,17 +431,22 @@ class Flasher {
       // this doesn't apply to normal slow ota
       return null;
     }
-
-    if (this._missedChunks.size) {
-      return Promise.resolve();
+    function aWait(ms: number): Promise {
+      return new Promise((res: Promise.resolve) => {
+        setTimeout((): void => res(), ms);
+      });
     }
-
-    return new Promise((resolve: () => void): number =>
-      setTimeout(() => {
-        logger.info('finished waiting');
-        resolve();
-      }, 3 * 1000),
-    );
+    let waitCount: number = 20;
+    while (waitCount > 0) {
+      waitCount -= 1;
+      if (this._missedChunks.size > 0) {
+        logger.info('Missed Chunks received');
+        return Promise.resolve();
+      }
+      await aWait(500);
+    }
+    logger.info('Finished waiting');
+    return Promise.resolve();
   };
 
   _getLogInfo = (): { cache_key?: string, deviceID: string } => {

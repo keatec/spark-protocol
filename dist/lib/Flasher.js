@@ -529,7 +529,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
 
                         // We don't need to wait for the response if using FastOTA.
 
-                        if (canUseFastOTA) {
+                        if (!canUseFastOTA) {
                           _context5.next = 7;
                           break;
                         }
@@ -640,34 +640,59 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
   };
 
   this._waitForMissedChunks = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee8() {
+    var aWait, waitCount;
     return _regenerator2.default.wrap(function _callee8$(_context8) {
       while (1) {
         switch (_context8.prev = _context8.next) {
           case 0:
+            aWait = function aWait(ms) {
+              return new _promise2.default(function (res) {
+                setTimeout(function () {
+                  return res();
+                }, ms);
+              });
+            };
+
             if (!(_this._protocolVersion <= 0)) {
-              _context8.next = 2;
+              _context8.next = 3;
               break;
             }
 
             return _context8.abrupt('return', null);
 
-          case 2:
-            if (!_this._missedChunks.size) {
-              _context8.next = 4;
+          case 3:
+            ;
+            waitCount = 20;
+
+          case 5:
+            if (!(waitCount > 0)) {
+              _context8.next = 14;
               break;
             }
 
+            waitCount -= 1;
+
+            if (!(_this._missedChunks.size > 0)) {
+              _context8.next = 10;
+              break;
+            }
+
+            logger.info('Missed Chunks received');
             return _context8.abrupt('return', _promise2.default.resolve());
 
-          case 4:
-            return _context8.abrupt('return', new _promise2.default(function (resolve) {
-              return setTimeout(function () {
-                logger.info('finished waiting');
-                resolve();
-              }, 3 * 1000);
-            }));
+          case 10:
+            _context8.next = 12;
+            return aWait(500);
 
-          case 5:
+          case 12:
+            _context8.next = 5;
+            break;
+
+          case 14:
+            logger.info('Finished waiting');
+            return _context8.abrupt('return', _promise2.default.resolve());
+
+          case 16:
           case 'end':
             return _context8.stop();
         }
