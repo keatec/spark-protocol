@@ -420,80 +420,90 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
 
           case 5:
             if (!_this._chunk) {
-              _context4.next = 18;
+              _context4.next = 19;
               break;
             }
 
             messageToken = _this._sendChunk(_this._chunkIndex);
 
+            logger.info({ messageToken: messageToken }, 'Read Next Chunk');
             _this._readNextChunk();
             // We don't need to wait for the response if using FastOTA.
 
             if (!canUseFastOTA) {
-              _context4.next = 10;
+              _context4.next = 11;
               break;
             }
 
             return _context4.abrupt('continue', 5);
 
-          case 10:
-            _context4.next = 12;
+          case 11:
+            _context4.next = 13;
             return _this._client.listenFor('ChunkReceived', null, messageToken);
 
-          case 12:
+          case 13:
             message = _context4.sent;
 
 
             logger.info({ message: message }, 'ChunkReceived');
 
             if (_CoapMessages2.default.statusIsOkay(message)) {
-              _context4.next = 16;
+              _context4.next = 17;
               break;
             }
 
             throw new Error("'ChunkReceived' failed.");
 
-          case 16:
+          case 17:
             _context4.next = 5;
             break;
 
-          case 18:
+          case 19:
             if (!canUseFastOTA) {
-              _context4.next = 23;
+              _context4.next = 27;
               break;
             }
 
-            _context4.next = 21;
+            // cleanup
+            logger.info('Wait for AllChunksDone');
+            _context4.next = 23;
             return _this._onAllChunksDone();
 
-          case 21:
-            _context4.next = 23;
+          case 23:
+            // Wait a whle for the error messages to come in for FastOTA
+            logger.info('Wait for MissedChunks');
+            _context4.next = 26;
             return _this._waitForMissedChunks();
 
-          case 23:
+          case 26:
+            logger.info('Done Wait for MissedChunks');
+
+          case 27:
 
             // Handle missed chunks
             counter = 0;
 
-          case 24:
+          case 28:
             if (!(_this._missedChunks.size > 0 && counter < 3)) {
-              _context4.next = 32;
+              _context4.next = 38;
               break;
             }
 
-            _context4.next = 27;
+            logger.info({ counter: counter }, 'Handle Missed Chunks');
+            _context4.next = 32;
             return _this._resendChunks();
 
-          case 27:
-            _context4.next = 29;
+          case 32:
+            _context4.next = 34;
             return _this._waitForMissedChunks();
 
-          case 29:
+          case 34:
+            logger.info({ counter: counter }, 'Done Handle Missed Chunks');
             counter += 1;
-            _context4.next = 24;
+            _context4.next = 28;
             break;
 
-          case 32:
+          case 38:
           case 'end':
             return _context4.stop();
         }
@@ -509,9 +519,9 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
             missedChunks = (0, _from2.default)(_this._missedChunks);
 
             _this._missedChunks.clear();
-
+            logger.info({ chunkSize: _this._chunkSize }, 'Resend Chunks');
             canUseFastOTA = _this._fastOtaEnabled && _this._protocolVersion > 0;
-            _context6.next = 5;
+            _context6.next = 6;
             return _promise2.default.all(missedChunks.map(function () {
               var _ref6 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee5(chunkIndex) {
                 var offset, messageToken, message;
@@ -563,7 +573,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
               };
             }()));
 
-          case 5:
+          case 6:
           case 'end':
             return _context6.stop();
         }
@@ -704,7 +714,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
       logInfo: _this._getLogInfo(),
       messageId: packet.messageId,
       missedChunks: _this._missedChunks.size
-    }, 'flasher - chunk missed - recovering ');
+    }, 'flasher - chunk missed - recovering, Extended ');
 
     // kosher if I ack before I've read the payload?
     _this._client.sendReply('ChunkMissedAck', packet.messageId, null, null, _this);
@@ -723,6 +733,12 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
   this._client = client;
   this._maxBinarySize = maxBinarySize || MAX_BINARY_SIZE;
   this._chunkSize = otaChunkSize || CHUNK_SIZE;
+  logger.info({
+    CHUNK_SIZE: CHUNK_SIZE,
+    maxBinarySize: maxBinarySize,
+    ota: this._fastOtaEnabled,
+    otaChunkSize: otaChunkSize
+  }, 'Flasher Created');
 }
 
 /*

@@ -64,6 +64,15 @@ class Flasher {
     this._client = client;
     this._maxBinarySize = maxBinarySize || MAX_BINARY_SIZE;
     this._chunkSize = otaChunkSize || CHUNK_SIZE;
+    logger.info(
+      {
+        CHUNK_SIZE,
+        maxBinarySize,
+        ota: this._fastOtaEnabled,
+        otaChunkSize,
+      },
+      'Flasher Created',
+    );
   }
 
   startFlashBuffer = async (
@@ -300,6 +309,7 @@ class Flasher {
     this._readNextChunk();
     while (this._chunk) {
       const messageToken = this._sendChunk(this._chunkIndex);
+      logger.info({ messageToken }, 'Read Next Chunk');
       this._readNextChunk();
       // We don't need to wait for the response if using FastOTA.
       if (canUseFastOTA) {
@@ -321,17 +331,21 @@ class Flasher {
 
     if (canUseFastOTA) {
       // cleanup
+      logger.info('Wait for AllChunksDone');
       await this._onAllChunksDone();
-
       // Wait a whle for the error messages to come in for FastOTA
+      logger.info('Wait for MissedChunks');
       await this._waitForMissedChunks();
+      logger.info('Done Wait for MissedChunks');
     }
 
     // Handle missed chunks
     let counter = 0;
     while (this._missedChunks.size > 0 && counter < 3) {
+      logger.info({ counter }, 'Handle Missed Chunks');
       await this._resendChunks();
       await this._waitForMissedChunks();
+      logger.info({ counter }, 'Done Handle Missed Chunks');
       counter += 1;
     }
   };
@@ -339,7 +353,7 @@ class Flasher {
   _resendChunks = async (): Promise<void> => {
     const missedChunks = Array.from(this._missedChunks);
     this._missedChunks.clear();
-
+    logger.info({ chunkSize: this._chunkSize }, 'Resend Chunks');
     const canUseFastOTA = this._fastOtaEnabled && this._protocolVersion > 0;
     await Promise.all(
       missedChunks.map(async (chunkIndex: number): Promise<void> => {
@@ -477,7 +491,7 @@ class Flasher {
         messageId: packet.messageId,
         missedChunks: this._missedChunks.size,
       },
-      'flasher - chunk missed - recovering ',
+      'flasher - chunk missed - recovering, Extended ',
     );
 
     // kosher if I ack before I've read the payload?
