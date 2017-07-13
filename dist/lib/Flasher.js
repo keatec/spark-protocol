@@ -672,7 +672,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
               });
             };
 
-            waitCount = 10;
+            waitCount = 30;
 
           case 4:
             if (!(waitCount > 0)) {
