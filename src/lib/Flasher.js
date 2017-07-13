@@ -426,6 +426,7 @@ class Flasher {
       this._client.releaseOwnership(this);
 
       // release our file handle
+      logger.info('Cleanup Filestream');
       const fileStream = this._fileStream;
       if (fileStream) {
         fileStream.close();

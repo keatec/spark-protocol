@@ -639,6 +639,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
       _this._client.releaseOwnership(_this);
 
       // release our file handle
+      logger.info('Cleanup Filestream');
       var fileStream = _this._fileStream;
       if (fileStream) {
         fileStream.close();
