@@ -471,7 +471,12 @@ class Flasher {
     }
 
     logger.warn(
-      { logInfo: this._getLogInfo() },
+      {
+        chunkIndex: this._chunkIndex,
+        logInfo: this._getLogInfo(),
+        messageId: packet.messageId,
+        missedChunks: this._missedChunks.size,
+      },
       'flasher - chunk missed - recovering ',
     );
 
