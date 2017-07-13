@@ -533,34 +533,35 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
 
                         (0, _nullthrows2.default)(_this._fileStream).seek(offset);
                         _this._chunkIndex = chunkIndex;
-
                         _this._readNextChunk();
                         messageToken = _this._sendChunk(chunkIndex);
 
+                        logger.info({ messageToken: messageToken }, 'Chunk sended');
+
                         // We don't need to wait for the response if using FastOTA.
 
-                        if (canUseFastOTA) {
-                          _context5.next = 7;
+                        if (!canUseFastOTA) {
+                          _context5.next = 8;
                           break;
                         }
 
                         return _context5.abrupt('return');
 
-                      case 7:
-                        _context5.next = 9;
+                      case 8:
+                        _context5.next = 10;
                         return _this._client.listenFor('ChunkReceived', null, messageToken);
 
-                      case 9:
+                      case 10:
                         message = _context5.sent;
 
                         if (_CoapMessages2.default.statusIsOkay(message)) {
-                          _context5.next = 12;
+                          _context5.next = 13;
                           break;
                         }
 
                         throw new Error("'ChunkReceived' failed.");
 
-                      case 12:
+                      case 13:
                       case 'end':
                         return _context5.stop();
                     }

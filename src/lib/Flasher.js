@@ -360,12 +360,12 @@ class Flasher {
         const offset = chunkIndex * this._chunkSize;
         nullthrows(this._fileStream).seek(offset);
         this._chunkIndex = chunkIndex;
-
         this._readNextChunk();
         const messageToken = this._sendChunk(chunkIndex);
+        logger.info({ messageToken }, 'Chunk sended');
 
         // We don't need to wait for the response if using FastOTA.
-        if (!canUseFastOTA) {
+        if (canUseFastOTA) {
           return;
         }
 
