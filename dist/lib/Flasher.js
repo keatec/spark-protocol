@@ -661,38 +661,37 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
             return _context8.abrupt('return', null);
 
           case 3:
-            ;
             waitCount = 20;
 
-          case 5:
+          case 4:
             if (!(waitCount > 0)) {
-              _context8.next = 14;
+              _context8.next = 13;
               break;
             }
 
             waitCount -= 1;
 
             if (!(_this._missedChunks.size > 0)) {
-              _context8.next = 10;
+              _context8.next = 9;
               break;
             }
 
             logger.info('Missed Chunks received');
             return _context8.abrupt('return', _promise2.default.resolve());
 
-          case 10:
-            _context8.next = 12;
+          case 9:
+            _context8.next = 11;
             return aWait(500);
 
-          case 12:
-            _context8.next = 5;
+          case 11:
+            _context8.next = 4;
             break;
 
-          case 14:
+          case 13:
             logger.info('Finished waiting');
             return _context8.abrupt('return', _promise2.default.resolve());
 
-          case 16:
+          case 15:
           case 'end':
             return _context8.stop();
         }
