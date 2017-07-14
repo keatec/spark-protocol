@@ -44,6 +44,12 @@ const CHUNK_SIZE = 256;
 const MAX_MISSED_CHUNKS = 10;
 const MAX_BINARY_SIZE = 108000; // According to the forums this is the max size for device.
 
+function waitFor(ms: number): Promise {
+  return new Promise((res: Promise.resolve) => {
+    setTimeout((): void => res(), ms);
+  });
+}
+
 class Flasher {
   _chunk: ?Buffer = null;
   _chunkSize: number = CHUNK_SIZE;
@@ -296,10 +302,12 @@ class Flasher {
         'Starting FastOTA update',
       );
     }
-
+    let chunkCount = 0;
     this._readNextChunk();
     while (this._chunk) {
       const messageToken = this._sendChunk(this._chunkIndex);
+      chunkCount += 1;
+      if (chunkCount % 50 === 0) await waitFor(500);
       this._readNextChunk();
       // We don't need to wait for the response if using FastOTA.
       if (canUseFastOTA) {
@@ -431,19 +439,18 @@ class Flasher {
       // this doesn't apply to normal slow ota
       return null;
     }
-    function aWait(ms: number): Promise {
-      return new Promise((res: Promise.resolve) => {
-        setTimeout((): void => res(), ms);
-      });
-    }
+
     let waitCount: number = 20;
     while (waitCount > 0) {
       waitCount -= 1;
       if (this._missedChunks.size > 0) {
-        logger.info('Missed Chunks received');
+        logger.info(
+          { missedChunks: this._missedChunks.size },
+          'Missed Chunks received',
+        );
         return Promise.resolve();
       }
-      await aWait(500);
+      await waitFor(500);
     }
     logger.info('Finished waiting');
     return Promise.resolve();
