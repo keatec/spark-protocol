@@ -313,13 +313,8 @@ class Flasher {
     }
 
     this._readNextChunk();
-    let sendCount = 0;
     while (this._chunk) {
       const messageToken = this._sendChunk(this._chunkIndex);
-      sendCount += 1;
-      if (sendCount % 35 === 0) {
-        await waitFor(500);
-      }
       logger.info({ messageToken }, 'Read Next Chunk');
       this._readNextChunk();
       // We don't need to wait for the response if using FastOTA.
