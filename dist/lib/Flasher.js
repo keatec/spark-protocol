@@ -24,10 +24,6 @@ var _regenerator = require('babel-runtime/regenerator');
 
 var _regenerator2 = _interopRequireDefault(_regenerator);
 
-var _promise = require('babel-runtime/core-js/promise');
-
-var _promise2 = _interopRequireDefault(_promise);
-
 var _asyncToGenerator2 = require('babel-runtime/helpers/asyncToGenerator');
 
 var _asyncToGenerator3 = _interopRequireDefault(_asyncToGenerator2);
@@ -39,6 +35,10 @@ var _set2 = _interopRequireDefault(_set);
 var _classCallCheck2 = require('babel-runtime/helpers/classCallCheck');
 
 var _classCallCheck3 = _interopRequireDefault(_classCallCheck2);
+
+var _promise = require('babel-runtime/core-js/promise');
+
+var _promise2 = _interopRequireDefault(_promise);
 
 var _BufferStream = require('./BufferStream');
 
@@ -108,6 +108,14 @@ var logger = _logger2.default.createModuleLogger(module);
 // that chunk is sent again
 // UpdateDone — sent by Server to indicate all firmware chunks have been sent
 //
+
+var waitFor = function oneSecondWait(ms) {
+  return new _promise2.default(function (res) {
+    setTimeout(function () {
+      return res();
+    }, ms);
+  });
+};
 
 var CHUNK_SIZE = 256;
 var MAX_MISSED_CHUNKS = 10;
@@ -391,7 +399,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
   };
 
   this._sendFile = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee4() {
-    var canUseFastOTA, messageToken, message, counter;
+    var canUseFastOTA, sendCount, messageToken, message, counter;
     return _regenerator2.default.wrap(function _callee4$(_context4) {
       while (1) {
         switch (_context4.prev = _context4.next) {
@@ -417,93 +425,105 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
             }
 
             _this._readNextChunk();
+            sendCount = 0;
 
-          case 5:
+          case 6:
             if (!_this._chunk) {
-              _context4.next = 19;
+              _context4.next = 24;
               break;
             }
 
             messageToken = _this._sendChunk(_this._chunkIndex);
 
+            sendCount += 1;
+
+            if (!(sendCount % 35 === 0)) {
+              _context4.next = 12;
+              break;
+            }
+
+            _context4.next = 12;
+            return waitFor(500);
+
+          case 12:
             logger.info({ messageToken: messageToken }, 'Read Next Chunk');
             _this._readNextChunk();
             // We don't need to wait for the response if using FastOTA.
 
             if (!canUseFastOTA) {
-              _context4.next = 11;
+              _context4.next = 16;
               break;
             }
 
-            return _context4.abrupt('continue', 5);
+            return _context4.abrupt('continue', 6);
 
-          case 11:
-            _context4.next = 13;
+          case 16:
+            _context4.next = 18;
             return _this._client.listenFor('ChunkReceived', null, messageToken);
 
-          case 13:
+          case 18:
             message = _context4.sent;
 
 
             logger.info({ message: message }, 'ChunkReceived');
 
             if (_CoapMessages2.default.statusIsOkay(message)) {
-              _context4.next = 17;
+              _context4.next = 22;
               break;
             }
 
             throw new Error("'ChunkReceived' failed.");
 
-          case 17:
-            _context4.next = 5;
+          case 22:
+            _context4.next = 6;
             break;
 
-          case 19:
+          case 24:
             if (!canUseFastOTA) {
-              _context4.next = 27;
+              _context4.next = 32;
               break;
             }
 
             // cleanup
             logger.info('Wait for AllChunksDone');
-            _context4.next = 23;
+            _context4.next = 28;
             return _this._onAllChunksDone();
 
-          case 23:
+          case 28:
             // Wait a whle for the error messages to come in for FastOTA
             logger.info('Wait for MissedChunks');
-            _context4.next = 26;
+            _context4.next = 31;
             return _this._waitForMissedChunks();
 
-          case 26:
+          case 31:
             logger.info('Done Wait for MissedChunks');
 
-          case 27:
+          case 32:
 
             // Handle missed chunks
             counter = 0;
 
-          case 28:
+          case 33:
             if (!(_this._missedChunks.size > 0 && counter < 3)) {
-              _context4.next = 38;
+              _context4.next = 43;
               break;
             }
 
-            logger.info({ counter: counter }, 'Handle Missed Chunks');
-            _context4.next = 32;
+            logger.info({ missedChunks: _this._missedChunks.size }, 'Handle Missed Chunks');
+            _context4.next = 37;
             return _this._resendChunks();
 
-          case 32:
-            _context4.next = 34;
+          case 37:
+            _context4.next = 39;
             return _this._waitForMissedChunks();
 
-          case 34:
+          case 39:
             logger.info({ counter: counter }, 'Done Handle Missed Chunks');
             counter += 1;
-            _context4.next = 28;
+            _context4.next = 33;
             break;
 
-          case 38:
+          case 43:
           case 'end':
             return _context4.stop();
         }
@@ -652,7 +672,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
   };
 
   this._waitForMissedChunks = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee8() {
-    var wait, waitCount;
+    var waitCount;
     return _regenerator2.default.wrap(function _callee8$(_context8) {
       while (1) {
         switch (_context8.prev = _context8.next) {
@@ -665,44 +685,36 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
             return _context8.abrupt('return', null);
 
           case 2:
-            wait = function oneSecondWait(ms) {
-              return new _promise2.default(function (res) {
-                setTimeout(function () {
-                  return res();
-                }, ms);
-              });
-            };
-
             waitCount = 30;
 
-          case 4:
+          case 3:
             if (!(waitCount > 0)) {
-              _context8.next = 12;
+              _context8.next = 11;
               break;
             }
 
             waitCount -= 1;
 
             if (!_this._missedChunks.size) {
-              _context8.next = 8;
+              _context8.next = 7;
               break;
             }
 
             return _context8.abrupt('return', _promise2.default.resolve());
 
-          case 8:
-            _context8.next = 10;
-            return wait(500);
+          case 7:
+            _context8.next = 9;
+            return waitFor(500);
 
-          case 10:
-            _context8.next = 4;
+          case 9:
+            _context8.next = 3;
             break;
 
-          case 12:
+          case 11:
             logger.info('finished waiting');
             return _context8.abrupt('return', _promise2.default.resolve());
 
-          case 14:
+          case 13:
           case 'end':
             return _context8.stop();
         }
@@ -753,6 +765,7 @@ function Flasher(client, maxBinarySize, otaChunkSize) {
         logger.error({ err: error }, 'onChunkMissed error reading payload');
       }
     }
+    logger.warn({ missedChunks: _this._missedChunks.size, mset: _this._missedChunks }, 'Missed Chunks found...');
   };
 
   this._client = client;

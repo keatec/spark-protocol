@@ -40,6 +40,12 @@ const logger = Logger.createModuleLogger(module);
 // UpdateDone — sent by Server to indicate all firmware chunks have been sent
 //
 
+const waitFor = function oneSecondWait(ms: number): Promise {
+  return new Promise((res: Promise.resolve) => {
+    setTimeout((): void => res(), ms);
+  });
+};
+
 const CHUNK_SIZE = 256;
 const MAX_MISSED_CHUNKS = 10;
 const MAX_BINARY_SIZE = 108000; // According to the forums this is the max size for device.
@@ -307,8 +313,13 @@ class Flasher {
     }
 
     this._readNextChunk();
+    let sendCount = 0;
     while (this._chunk) {
       const messageToken = this._sendChunk(this._chunkIndex);
+      sendCount += 1;
+      if (sendCount % 35 === 0) {
+        await waitFor(500);
+      }
       logger.info({ messageToken }, 'Read Next Chunk');
       this._readNextChunk();
       // We don't need to wait for the response if using FastOTA.
@@ -342,7 +353,10 @@ class Flasher {
     // Handle missed chunks
     let counter = 0;
     while (this._missedChunks.size > 0 && counter < 3) {
-      logger.info({ counter }, 'Handle Missed Chunks');
+      logger.info(
+        { missedChunks: this._missedChunks.size },
+        'Handle Missed Chunks',
+      );
       await this._resendChunks();
       await this._waitForMissedChunks();
       logger.info({ counter }, 'Done Handle Missed Chunks');
@@ -446,18 +460,13 @@ class Flasher {
       // this doesn't apply to normal slow ota
       return null;
     }
-    const wait = function oneSecondWait(ms: number): Promise {
-      return new Promise((res: Promise.resolve) => {
-        setTimeout((): void => res(), ms);
-      });
-    };
     let waitCount: number = 30;
     while (waitCount > 0) {
       waitCount -= 1;
       if (this._missedChunks.size) {
         return Promise.resolve();
       }
-      await wait(500);
+      await waitFor(500);
     }
     logger.info('finished waiting');
     return Promise.resolve();
@@ -517,6 +526,10 @@ class Flasher {
         logger.error({ err: error }, 'onChunkMissed error reading payload');
       }
     }
+    logger.warn(
+      { missedChunks: this._missedChunks.size, mset: this._missedChunks },
+      'Missed Chunks found...',
+    );
   };
 }
 
