@@ -518,6 +518,7 @@ class Device extends EventEmitter {
       );
       return;
     }
+
     this._cipherStream.write(message);
   };
 
@@ -1016,7 +1017,7 @@ class Device extends EventEmitter {
     );
 
   _toHexString = (value: number): string =>
-    (value < 10 ? '0' : '') + value.toString(16);
+    Buffer.from([value]).toString('hex');
 
   getDeviceID = (): string => this._attributes.deviceID;
 

@@ -216,7 +216,7 @@ class CoapMessages {
           ...queryParams,
         ]),
         payload: data || new Buffer(0),
-        token: token && Buffer.from([token]),
+        token: (token || token === 0) && Buffer.from([token]),
       });
     } catch (error) {
       logger.error({ err: error }, 'Coap Error');

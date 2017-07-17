@@ -614,6 +614,7 @@ var Device = function (_EventEmitter) {
         }, 'Device - sendReply before READY');
         return;
       }
+
       _this._cipherStream.write(message);
     };
 
@@ -1172,7 +1173,7 @@ var Device = function (_EventEmitter) {
     };
 
     _this._toHexString = function (value) {
-      return (value < 10 ? '0' : '') + value.toString(16);
+      return Buffer.from([value]).toString('hex');
     };
 
     _this.getDeviceID = function () {
