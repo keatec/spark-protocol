@@ -236,36 +236,77 @@ var downloadBlob = function () {
 }();
 
 var downloadFirmwareBinaries = function () {
-  var _ref3 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee3(assets) {
-    var assetFileNames;
-    return _regenerator2.default.wrap(function _callee3$(_context3) {
-      while (1) {
-        switch (_context3.prev = _context3.next) {
-          case 0:
-            _context3.next = 2;
-            return _promise2.default.all(assets.map(function (asset) {
-              if (asset.name.match(/^(system-part|bootloader)/)) {
+  var _ref3 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee4(assets) {
+    // ensure we are not manipulating the original array;
+    var download = function () {
+      var _ref4 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee3() {
+        var asset;
+        return _regenerator2.default.wrap(function _callee3$(_context3) {
+          while (1) {
+            switch (_context3.prev = _context3.next) {
+              case 0:
+                if (!(binariesLeftToDownload.length > 0)) {
+                  _context3.next = 11;
+                  break;
+                }
+
+                asset = binariesLeftToDownload.splice(0, 1)[0]; // Grab first from Queue and Process
+
+                if (!asset.name.match(/^(system-part|bootloader)/)) {
+                  _context3.next = 8;
+                  break;
+                }
+
+                _context3.t0 = assetFileNames;
+                _context3.next = 6;
                 return downloadAssetFile(asset);
-              }
-              return _promise2.default.resolve('');
-            }));
 
-          case 2:
-            assetFileNames = _context3.sent;
+              case 6:
+                _context3.t1 = _context3.sent;
 
+                _context3.t0.push.call(_context3.t0, _context3.t1);
 
-            console.log();
+              case 8:
+                ;
+                _context3.next = 0;
+                break;
 
-            return _context3.abrupt('return', assetFileNames.filter(function (item) {
+              case 11:
+              case 'end':
+                return _context3.stop();
+            }
+          }
+        }, _callee3, this);
+      }));
+
+      return function download() {
+        return _ref4.apply(this, arguments);
+      };
+    }();
+
+    var assetFileNames, binariesLeftToDownload;
+    return _regenerator2.default.wrap(function _callee4$(_context4) {
+      while (1) {
+        switch (_context4.prev = _context4.next) {
+          case 0:
+            assetFileNames = [];
+            binariesLeftToDownload = [].concat(assets);
+            ;
+            _context4.next = 5;
+            return _promise2.default.all([// Start asynchronus Downloads and wait until every instance has finished
+            download(), download(), download(), download(), download()]);
+
+          case 5:
+            return _context4.abrupt('return', assetFileNames.filter(function (item) {
               return !!item;
             }));
 
-          case 5:
+          case 6:
           case 'end':
-            return _context3.stop();
+            return _context4.stop();
         }
       }
-    }, _callee3, undefined);
+    }, _callee4, undefined);
   }));
 
   return function downloadFirmwareBinaries(_x3) {
@@ -274,14 +315,14 @@ var downloadFirmwareBinaries = function () {
 }();
 
 var updateSettings = function () {
-  var _ref4 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee4(binaryFileNames) {
+  var _ref5 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee5(binaryFileNames) {
     var parser, moduleInfos, scriptSettings;
-    return _regenerator2.default.wrap(function _callee4$(_context4) {
+    return _regenerator2.default.wrap(function _callee5$(_context5) {
       while (1) {
-        switch (_context4.prev = _context4.next) {
+        switch (_context5.prev = _context5.next) {
           case 0:
             parser = new _binaryVersionReader.HalModuleParser();
-            _context4.next = 3;
+            _context5.next = 3;
             return _promise2.default.all(binaryFileNames.map(function (filename) {
               return new _promise2.default(function (resolve) {
                 return parser.parseFile(_settings2.default.BINARIES_DIRECTORY + '/' + filename, function (result) {
@@ -294,7 +335,7 @@ var updateSettings = function () {
             }));
 
           case 3:
-            moduleInfos = _context4.sent;
+            moduleInfos = _context5.sent;
             scriptSettings = (0, _stringify2.default)(moduleInfos, null, 2);
 
 
@@ -303,25 +344,25 @@ var updateSettings = function () {
 
           case 7:
           case 'end':
-            return _context4.stop();
+            return _context5.stop();
         }
       }
-    }, _callee4, undefined);
+    }, _callee5, undefined);
   }));
 
   return function updateSettings(_x4) {
-    return _ref4.apply(this, arguments);
+    return _ref5.apply(this, arguments);
   };
 }();
 
 var downloadAppBinaries = function () {
-  var _ref5 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee5() {
+  var _ref6 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee6() {
     var assets;
-    return _regenerator2.default.wrap(function _callee5$(_context5) {
+    return _regenerator2.default.wrap(function _callee6$(_context6) {
       while (1) {
-        switch (_context5.prev = _context5.next) {
+        switch (_context6.prev = _context6.next) {
           case 0:
-            _context5.next = 2;
+            _context6.next = 2;
             return githubAPI.repos.getContent({
               owner: GITHUB_USER,
               path: 'assets/binaries',
@@ -329,36 +370,36 @@ var downloadAppBinaries = function () {
             });
 
           case 2:
-            assets = _context5.sent;
-            _context5.next = 5;
+            assets = _context6.sent;
+            _context6.next = 5;
             return _promise2.default.all(assets.data.map(function (asset) {
               return downloadBlob(asset);
             }));
 
           case 5:
-            return _context5.abrupt('return', _context5.sent);
+            return _context6.abrupt('return', _context6.sent);
 
           case 6:
           case 'end':
-            return _context5.stop();
+            return _context6.stop();
         }
       }
-    }, _callee5, undefined);
+    }, _callee6, undefined);
   }));
 
   return function downloadAppBinaries() {
-    return _ref5.apply(this, arguments);
+    return _ref6.apply(this, arguments);
   };
 }();
 
-(0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee6() {
-  var _ref7, releases, assets, downloadedBinaries;
+(0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee7() {
+  var _ref8, releases, assets, downloadedBinaries;
 
-  return _regenerator2.default.wrap(function _callee6$(_context6) {
+  return _regenerator2.default.wrap(function _callee7$(_context7) {
     while (1) {
-      switch (_context6.prev = _context6.next) {
+      switch (_context7.prev = _context7.next) {
         case 0:
-          _context6.prev = 0;
+          _context7.prev = 0;
 
           if (!_fs2.default.existsSync(_settings2.default.BINARIES_DIRECTORY)) {
             _mkdirp2.default.sync(_settings2.default.BINARIES_DIRECTORY);
@@ -367,22 +408,22 @@ var downloadAppBinaries = function () {
             _mkdirp2.default.sync(FILE_GEN_DIRECTORY);
           }
 
-          _context6.prev = 3;
-          _context6.next = 6;
+          _context7.prev = 3;
+          _context7.next = 6;
           return downloadAppBinaries();
 
         case 6:
-          _context6.next = 11;
+          _context7.next = 11;
           break;
 
         case 8:
-          _context6.prev = 8;
-          _context6.t0 = _context6['catch'](3);
+          _context7.prev = 8;
+          _context7.t0 = _context7['catch'](3);
 
-          console.error(_context6.t0);
+          console.error(_context7.t0);
 
         case 11:
-          _context6.next = 13;
+          _context7.next = 13;
           return githubAPI.repos.getReleases({
             owner: GITHUB_USER,
             page: 0,
@@ -391,7 +432,7 @@ var downloadAppBinaries = function () {
           });
 
         case 13:
-          releases = _context6.sent;
+          releases = _context7.sent;
 
 
           releases.data.sort(function (a, b) {
@@ -404,33 +445,33 @@ var downloadAppBinaries = function () {
             return 0;
           });
 
-          assets = (_ref7 = []).concat.apply(_ref7, (0, _toConsumableArray3.default)(releases.data.map(function (release) {
+          assets = (_ref8 = []).concat.apply(_ref8, (0, _toConsumableArray3.default)(releases.data.map(function (release) {
             return release.assets;
           })));
-          _context6.next = 18;
+          _context7.next = 18;
           return downloadFirmwareBinaries(assets);
 
         case 18:
-          downloadedBinaries = _context6.sent;
-          _context6.next = 21;
+          downloadedBinaries = _context7.sent;
+          _context7.next = 21;
           return updateSettings(downloadedBinaries);
 
         case 21:
 
           console.log('\r\nCompleted Sync');
-          _context6.next = 27;
+          _context7.next = 27;
           break;
 
         case 24:
-          _context6.prev = 24;
-          _context6.t1 = _context6['catch'](0);
+          _context7.prev = 24;
+          _context7.t1 = _context7['catch'](0);
 
-          console.log(_context6.t1);
+          console.log(_context7.t1);
 
         case 27:
         case 'end':
-          return _context6.stop();
+          return _context7.stop();
       }
     }
-  }, _callee6, undefined, [[0, 24], [3, 8]]);
+  }, _callee7, undefined, [[0, 24], [3, 8]]);
 }))();

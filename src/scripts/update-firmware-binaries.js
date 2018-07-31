@@ -147,17 +147,21 @@ const downloadBlob = async (asset: any): Promise<*> => {
 const downloadFirmwareBinaries = async (
   assets: Array<Asset>,
 ): Promise<Array<string>> => {
-  const assetFileNames = await Promise.all(
-    assets.map((asset: Object): Promise<string> => {
+  const assetFileNames: Array<string> = [];
+  const binariesLeftToDownload: Array<Asset> = [].concat(assets); // ensure we are not manipulating the original array;
+  async function download(): Promise<void> {
+    while (binariesLeftToDownload.length > 0) {
+      const asset = binariesLeftToDownload.splice(0, 1)[0]; // Grab first from Queue and Process
       if (asset.name.match(/^(system-part|bootloader)/)) {
-        return downloadAssetFile(asset);
+        assetFileNames.push(await downloadAssetFile(asset));
       }
-      return Promise.resolve('');
-    }),
-  );
-
-  console.log();
-
+    }
+  }
+  const running: Array<Promise<void>> = [];
+  for (let i = 0; i < 10; i += 1) {
+    running.push(download());
+  }
+  await Promise.all(running); // Start asynchronus Downloads and wait until every instance has finished
   return assetFileNames.filter((item: ?string): boolean => !!item);
 };
 
