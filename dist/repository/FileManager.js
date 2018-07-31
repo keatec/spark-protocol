@@ -39,6 +39,11 @@ var FileManager = function () {
   }
 
   (0, _createClass3.default)(FileManager, [{
+    key: 'count',
+    value: function count() {
+      return _fs2.default.readdirSync(this._directoryPath).length;
+    }
+  }, {
     key: 'createFile',
     value: function createFile(fileName, data) {
       if (_fs2.default.existsSync(_path2.default.join(this._directoryPath, fileName))) {

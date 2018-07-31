@@ -16,6 +16,10 @@ class FileManager {
     }
   }
 
+  count(): number {
+    return fs.readdirSync(this._directoryPath).length;
+  }
+
   createFile(fileName: string, data: string | Buffer) {
     if (fs.existsSync(path.join(this._directoryPath, fileName))) {
       return;

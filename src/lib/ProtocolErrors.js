@@ -37,4 +37,5 @@ const ProtocolErrors: Array<[number, string]> = [
   [0x7ffff, 'UNKNOWN'],
 ];
 
-export default new Map(ProtocolErrors);
+const OUTPUT: Map<number, string> = new Map(ProtocolErrors);
+export default OUTPUT;

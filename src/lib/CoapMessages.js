@@ -73,7 +73,7 @@ const _decodeNumericValue = (buffer: Buffer): number => {
     return buffer.readUInt16BE(0);
   } else if (length === 3) {
     /* eslint-disable no-bitwise*/
-    return (buffer[1] << 8) | (buffer[2] + (buffer[0] << 16 >>> 0));
+    return (buffer[1] << 8) | (buffer[2] + ((buffer[0] << 16) >>> 0));
     /* eslint-enable no-bitwise*/
   }
 
@@ -190,11 +190,10 @@ class CoapMessages {
       }
 
       let uriOptions = [];
-      const hasExistingUri = (options || [])
-        .some(
-          (item: CoapOption): boolean =>
-            item.name === CoapMessage.Option.URI_PATH,
-        );
+      const hasExistingUri = (options || []).some(
+        (item: CoapOption): boolean =>
+          item.name === CoapMessage.Option.URI_PATH,
+      );
 
       if (uri && !hasExistingUri) {
         uriOptions = uri
@@ -216,7 +215,7 @@ class CoapMessages {
           ...queryParams,
         ]),
         payload: data || new Buffer(0),
-        token: token && Buffer.from([token]),
+        token: (token || token === 0) && Buffer.from([token]),
       });
     } catch (error) {
       logger.error({ err: error }, 'Coap Error');

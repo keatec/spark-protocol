@@ -1,7 +1,7 @@
 // @flow
 
 import EventPublisher from '../lib/EventPublisher';
-import type { Event } from '../types';
+import type { ProtocolEvent } from '../types';
 
 class EventProvider {
   _eventPublisher: EventPublisher;
@@ -11,7 +11,7 @@ class EventProvider {
   }
 
   onNewEvent = (
-    callback: (event: Event) => void,
+    callback: (event: ProtocolEvent) => void,
     eventNamePrefix: string = '*',
   ) => {
     this._eventPublisher.subscribe(
@@ -27,9 +27,9 @@ class EventProvider {
   };
 
   _onNewEvent = (
-    callback: (event: Event) => void,
-  ): ((event: Event) => void) => (event: Event) => {
-    const eventToBroadcast: Event = ({
+    callback: (event: ProtocolEvent) => void,
+  ): ((event: ProtocolEvent) => void) => (event: ProtocolEvent) => {
+    const eventToBroadcast: ProtocolEvent = ({
       ...event,
     }: any);
 

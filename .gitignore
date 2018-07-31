@@ -30,3 +30,4 @@ node_modules
 /spark-protocol.esproj
 third-party
 data
+.env

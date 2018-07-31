@@ -1,8 +1,21 @@
+#! /usr/bin/env node
 'use strict';
+
+var _toConsumableArray2 = require('babel-runtime/helpers/toConsumableArray');
+
+var _toConsumableArray3 = _interopRequireDefault(_toConsumableArray2);
+
+var _stringify = require('babel-runtime/core-js/json/stringify');
+
+var _stringify2 = _interopRequireDefault(_stringify);
 
 var _extends2 = require('babel-runtime/helpers/extends');
 
 var _extends3 = _interopRequireDefault(_extends2);
+
+var _promise = require('babel-runtime/core-js/promise');
+
+var _promise2 = _interopRequireDefault(_promise);
 
 var _regenerator = require('babel-runtime/regenerator');
 
@@ -12,13 +25,9 @@ var _asyncToGenerator2 = require('babel-runtime/helpers/asyncToGenerator');
 
 var _asyncToGenerator3 = _interopRequireDefault(_asyncToGenerator2);
 
-var _promise = require('babel-runtime/core-js/promise');
+var _values = require('babel-runtime/core-js/object/values');
 
-var _promise2 = _interopRequireDefault(_promise);
-
-var _stringify = require('babel-runtime/core-js/json/stringify');
-
-var _stringify2 = _interopRequireDefault(_stringify);
+var _values2 = _interopRequireDefault(_values);
 
 var _fs = require('fs');
 
@@ -28,17 +37,13 @@ var _path = require('path');
 
 var _path2 = _interopRequireDefault(_path);
 
-var _github = require('github');
+var _rest = require('@octokit/rest');
 
-var _github2 = _interopRequireDefault(_github);
+var _rest2 = _interopRequireDefault(_rest);
 
 var _mkdirp = require('mkdirp');
 
 var _mkdirp2 = _interopRequireDefault(_mkdirp);
-
-var _request = require('request');
-
-var _request2 = _interopRequireDefault(_request);
 
 var _settings = require('../settings');
 
@@ -48,15 +53,20 @@ var _nullthrows = require('nullthrows');
 
 var _nullthrows2 = _interopRequireDefault(_nullthrows);
 
+var _binaryVersionReader = require('binary-version-reader');
+
+var _dotenv = require('dotenv');
+
+var _dotenv2 = _interopRequireDefault(_dotenv);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var GITHUB_USER = 'spark';
+_dotenv2.default.config();
 
+var GITHUB_USER = 'particle-iot';
 var GITHUB_FIRMWARE_REPOSITORY = 'firmware';
 var GITHUB_CLI_REPOSITORY = 'particle-cli';
 var FILE_GEN_DIRECTORY = _path2.default.join(__dirname, '../../third-party/');
-var MAPPING_FILE = FILE_GEN_DIRECTORY + 'versions.json';
-var SPECIFICATIONS_FILE = FILE_GEN_DIRECTORY + 'specifications.js';
 var SETTINGS_FILE = FILE_GEN_DIRECTORY + 'settings.json';
 
 // This default is here so that the regex will work when updating these files.
@@ -94,58 +104,76 @@ var DEFAULT_SETTINGS = {
     }
   }
 };
+
+var FIRMWARE_PLATFORMS = (0, _values2.default)(DEFAULT_SETTINGS.knownPlatforms).map(function (platform) {
+  return platform.toLowerCase();
+});
 /* eslint-enable */
 
-var versionTag = '';
-var githubAPI = new _github2.default();
+var githubAPI = new _rest2.default();
 
-var exitWithMessage = function exitWithMessage(message) {
-  console.log(message);
-  process.exit(0);
-};
+var _process$env = process.env,
+    GITHUB_AUTH_PASSWORD = _process$env.GITHUB_AUTH_PASSWORD,
+    GITHUB_AUTH_TYPE = _process$env.GITHUB_AUTH_TYPE,
+    GITHUB_AUTH_TOKEN = _process$env.GITHUB_AUTH_TOKEN,
+    GITHUB_AUTH_USERNAME = _process$env.GITHUB_AUTH_USERNAME;
 
-var exitWithJSON = function exitWithJSON(json) {
-  exitWithMessage((0, _stringify2.default)(json, null, 2));
-};
 
-var downloadFile = function downloadFile(url) {
-  return new _promise2.default(function (resolve) {
-    var filename = (0, _nullthrows2.default)(url.match(/.*\/(.*)/))[1];
-    console.log('Downloading ' + filename + '...');
+if (!GITHUB_AUTH_TYPE) {
+  throw new Error('You need to set up a .env file with auth credentials');
+}
 
-    var file = _fs2.default.createWriteStream(_settings2.default.BINARIES_DIRECTORY + '/' + filename);
-
-    file.on('finish', function () {
-      return file.close(function () {
-        return resolve(filename);
-      });
-    });
-    (0, _request2.default)(url).pipe(file).on('error', exitWithJSON);
+if (GITHUB_AUTH_TYPE === 'oauth') {
+  githubAPI.authenticate({
+    token: GITHUB_AUTH_TOKEN,
+    type: GITHUB_AUTH_TYPE
   });
-};
+} else {
+  githubAPI.authenticate({
+    password: GITHUB_AUTH_PASSWORD,
+    type: GITHUB_AUTH_TYPE,
+    username: GITHUB_AUTH_USERNAME
+  });
+}
 
-var downloadFirmwareBinaries = function () {
-  var _ref = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee(assets) {
-    var assetFileNames;
+var downloadAssetFile = function () {
+  var _ref = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee(asset) {
+    var url, filename, fileWithPath;
     return _regenerator2.default.wrap(function _callee$(_context) {
       while (1) {
         switch (_context.prev = _context.next) {
           case 0:
-            _context.next = 2;
-            return _promise2.default.all(assets.map(function (asset) {
-              if (asset.name.match(/^system-part/)) {
-                return downloadFile(asset.browser_download_url);
-              }
-              return _promise2.default.resolve('');
+            url = asset.browser_download_url;
+            filename = (0, _nullthrows2.default)(url.match(/.*\/(.*)/))[1];
+            fileWithPath = _settings2.default.BINARIES_DIRECTORY + '/' + filename;
+
+            if (!_fs2.default.existsSync(fileWithPath)) {
+              _context.next = 6;
+              break;
+            }
+
+            console.log('File Exists: ' + filename);
+            return _context.abrupt('return', filename);
+
+          case 6:
+
+            console.log('Downloading ' + filename + '...');
+
+            return _context.abrupt('return', githubAPI.repos.getAsset({
+              headers: {
+                accept: 'application/octet-stream'
+              },
+              id: asset.id,
+              owner: GITHUB_USER,
+              repo: GITHUB_FIRMWARE_REPOSITORY
+            }).then(function (response) {
+              _fs2.default.writeFileSync(fileWithPath, response.data);
+              return filename;
+            }).catch(function (error) {
+              return console.error(asset, error);
             }));
 
-          case 2:
-            assetFileNames = _context.sent;
-            return _context.abrupt('return', assetFileNames.filter(function (item) {
-              return !!item;
-            }));
-
-          case 4:
+          case 8:
           case 'end':
             return _context.stop();
         }
@@ -153,67 +181,48 @@ var downloadFirmwareBinaries = function () {
     }, _callee, undefined);
   }));
 
-  return function downloadFirmwareBinaries(_x) {
+  return function downloadAssetFile(_x) {
     return _ref.apply(this, arguments);
   };
 }();
 
-var updateSettings = function updateSettings() {
-  var versionNumber = versionTag;
-  if (versionNumber[0] === 'v') {
-    versionNumber = versionNumber.substr(1);
-  }
-
-  var scriptSettings = (0, _stringify2.default)((0, _extends3.default)({
-    versionNumber: versionNumber
-  }, DEFAULT_SETTINGS), null, 2);
-
-  var settingsBinaries = [];
-  scriptSettings = scriptSettings.replace(/(system-part\d-).*(-.*.bin)/g, function (filename, part, device) {
-    var newFilename = part + versionNumber + device;
-    settingsBinaries.push(newFilename);
-    return newFilename;
-  });
-
-  _fs2.default.writeFileSync(SETTINGS_FILE, scriptSettings);
-  console.log('Updated settings');
-
-  return settingsBinaries;
-};
-
-var verifyBinariesMatch = function verifyBinariesMatch(downloadedBinaries, settingsBinaries) {
-  if ((0, _stringify2.default)(downloadedBinaries.sort()) !== (0, _stringify2.default)(settingsBinaries.sort())) {
-    console.log("\n\nWARNING: the list of downloaded binaries doesn't match the list " + 'of binaries in settings.js');
-    console.log('Downloaded:  ', downloadedBinaries);
-    console.log('settings.js: ', settingsBinaries);
-  }
-};
-
-var downloadAppBinaries = function () {
-  var _ref2 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee2() {
-    var assets;
+var downloadBlob = function () {
+  var _ref2 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee2(asset) {
+    var filename, fileWithPath;
     return _regenerator2.default.wrap(function _callee2$(_context2) {
       while (1) {
         switch (_context2.prev = _context2.next) {
           case 0:
-            _context2.next = 2;
-            return githubAPI.repos.getContent({
-              owner: GITHUB_USER,
-              path: 'binaries',
-              repo: GITHUB_CLI_REPOSITORY
-            });
+            filename = asset.name;
+            fileWithPath = _settings2.default.BINARIES_DIRECTORY + '/' + filename;
 
-          case 2:
-            assets = _context2.sent;
-            _context2.next = 5;
-            return _promise2.default.all(assets.map(function (asset) {
-              return downloadFile(asset.download_url);
-            }));
+            if (!_fs2.default.existsSync(fileWithPath)) {
+              _context2.next = 5;
+              break;
+            }
+
+            console.log('File Exists: ' + filename);
+            return _context2.abrupt('return', filename);
 
           case 5:
-            return _context2.abrupt('return', _context2.sent);
 
-          case 6:
+            console.log('Downloading ' + filename + '...');
+
+            return _context2.abrupt('return', githubAPI.gitdata.getBlob({
+              headers: {
+                accept: 'application/vnd.github.v3.raw'
+              },
+              owner: GITHUB_USER,
+              repo: GITHUB_CLI_REPOSITORY,
+              sha: asset.sha
+            }).then(function (response) {
+              _fs2.default.writeFileSync(fileWithPath, response.data);
+              return filename;
+            }).catch(function (error) {
+              return console.error(error);
+            }));
+
+          case 7:
           case 'end':
             return _context2.stop();
         }
@@ -221,23 +230,135 @@ var downloadAppBinaries = function () {
     }, _callee2, undefined);
   }));
 
-  return function downloadAppBinaries() {
+  return function downloadBlob(_x2) {
     return _ref2.apply(this, arguments);
   };
 }();
 
-(0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee3() {
-  var releases, release, downloadedBinaries, settingsBinaries, specificationsResponse, versionResponse, versionText, mapping;
-  return _regenerator2.default.wrap(function _callee3$(_context3) {
+var downloadFirmwareBinaries = function () {
+  var _ref3 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee3(assets) {
+    var assetFileNames;
+    return _regenerator2.default.wrap(function _callee3$(_context3) {
+      while (1) {
+        switch (_context3.prev = _context3.next) {
+          case 0:
+            _context3.next = 2;
+            return _promise2.default.all(assets.map(function (asset) {
+              if (asset.name.match(/^(system-part|bootloader)/)) {
+                return downloadAssetFile(asset);
+              }
+              return _promise2.default.resolve('');
+            }));
+
+          case 2:
+            assetFileNames = _context3.sent;
+
+
+            console.log();
+
+            return _context3.abrupt('return', assetFileNames.filter(function (item) {
+              return !!item;
+            }));
+
+          case 5:
+          case 'end':
+            return _context3.stop();
+        }
+      }
+    }, _callee3, undefined);
+  }));
+
+  return function downloadFirmwareBinaries(_x3) {
+    return _ref3.apply(this, arguments);
+  };
+}();
+
+var updateSettings = function () {
+  var _ref4 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee4(binaryFileNames) {
+    var parser, moduleInfos, scriptSettings;
+    return _regenerator2.default.wrap(function _callee4$(_context4) {
+      while (1) {
+        switch (_context4.prev = _context4.next) {
+          case 0:
+            parser = new _binaryVersionReader.HalModuleParser();
+            _context4.next = 3;
+            return _promise2.default.all(binaryFileNames.map(function (filename) {
+              return new _promise2.default(function (resolve) {
+                return parser.parseFile(_settings2.default.BINARIES_DIRECTORY + '/' + filename, function (result) {
+                  resolve((0, _extends3.default)({}, result, {
+                    fileBuffer: undefined,
+                    filename: filename
+                  }));
+                });
+              });
+            }));
+
+          case 3:
+            moduleInfos = _context4.sent;
+            scriptSettings = (0, _stringify2.default)(moduleInfos, null, 2);
+
+
+            _fs2.default.writeFileSync(SETTINGS_FILE, scriptSettings);
+            console.log('Updated settings');
+
+          case 7:
+          case 'end':
+            return _context4.stop();
+        }
+      }
+    }, _callee4, undefined);
+  }));
+
+  return function updateSettings(_x4) {
+    return _ref4.apply(this, arguments);
+  };
+}();
+
+var downloadAppBinaries = function () {
+  var _ref5 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee5() {
+    var assets;
+    return _regenerator2.default.wrap(function _callee5$(_context5) {
+      while (1) {
+        switch (_context5.prev = _context5.next) {
+          case 0:
+            _context5.next = 2;
+            return githubAPI.repos.getContent({
+              owner: GITHUB_USER,
+              path: 'assets/binaries',
+              repo: GITHUB_CLI_REPOSITORY
+            });
+
+          case 2:
+            assets = _context5.sent;
+            _context5.next = 5;
+            return _promise2.default.all(assets.data.map(function (asset) {
+              return downloadBlob(asset);
+            }));
+
+          case 5:
+            return _context5.abrupt('return', _context5.sent);
+
+          case 6:
+          case 'end':
+            return _context5.stop();
+        }
+      }
+    }, _callee5, undefined);
+  }));
+
+  return function downloadAppBinaries() {
+    return _ref5.apply(this, arguments);
+  };
+}();
+
+(0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee6() {
+  var _ref7, releases, assets, downloadedBinaries;
+
+  return _regenerator2.default.wrap(function _callee6$(_context6) {
     while (1) {
-      switch (_context3.prev = _context3.next) {
+      switch (_context6.prev = _context6.next) {
         case 0:
-          // Start running process. If you pass `0.6.0` it will install that version of
-          // the firmware.
-          versionTag = process.argv[2];
-          if (versionTag && versionTag[0] !== 'v') {
-            versionTag = 'v' + versionTag;
-          }
+          _context6.prev = 0;
 
           if (!_fs2.default.existsSync(_settings2.default.BINARIES_DIRECTORY)) {
             _mkdirp2.default.sync(_settings2.default.BINARIES_DIRECTORY);
@@ -246,17 +367,22 @@ var downloadAppBinaries = function () {
             _mkdirp2.default.sync(FILE_GEN_DIRECTORY);
           }
 
-          // Download app binaries
-          _context3.next = 6;
+          _context6.prev = 3;
+          _context6.next = 6;
           return downloadAppBinaries();
 
         case 6:
-          if (!(process.argv.length !== 3)) {
-            _context3.next = 13;
-            break;
-          }
+          _context6.next = 11;
+          break;
 
-          _context3.next = 9;
+        case 8:
+          _context6.prev = 8;
+          _context6.t0 = _context6['catch'](3);
+
+          console.error(_context6.t0);
+
+        case 11:
+          _context6.next = 13;
           return githubAPI.repos.getReleases({
             owner: GITHUB_USER,
             page: 0,
@@ -264,16 +390,11 @@ var downloadAppBinaries = function () {
             repo: GITHUB_FIRMWARE_REPOSITORY
           });
 
-        case 9:
-          releases = _context3.sent;
+        case 13:
+          releases = _context6.sent;
 
-          releases = releases.filter(function (release
-          // Don't use release candidates.. we only need main releases.
-          ) {
-            return !release.tag_name.includes('-rc') && !release.tag_name.includes('-pi') && release.assets.length > 2;
-          });
 
-          releases.sort(function (a, b) {
+          releases.data.sort(function (a, b) {
             if (a.tag_name < b.tag_name) {
               return 1;
             }
@@ -283,87 +404,33 @@ var downloadAppBinaries = function () {
             return 0;
           });
 
-          versionTag = releases[0].tag_name;
-
-        case 13:
-          _context3.next = 15;
-          return githubAPI.repos.getReleaseByTag({
-            owner: GITHUB_USER,
-            repo: GITHUB_FIRMWARE_REPOSITORY,
-            tag: versionTag
-          });
-
-        case 15:
-          release = _context3.sent;
-          _context3.next = 18;
-          return downloadFirmwareBinaries(release.assets);
+          assets = (_ref7 = []).concat.apply(_ref7, (0, _toConsumableArray3.default)(releases.data.map(function (release) {
+            return release.assets;
+          })));
+          _context6.next = 18;
+          return downloadFirmwareBinaries(assets);
 
         case 18:
-          downloadedBinaries = _context3.sent;
-          _context3.next = 21;
-          return updateSettings();
+          downloadedBinaries = _context6.sent;
+          _context6.next = 21;
+          return updateSettings(downloadedBinaries);
 
         case 21:
-          settingsBinaries = _context3.sent;
-
-          verifyBinariesMatch(downloadedBinaries, settingsBinaries);
-
-          _context3.next = 25;
-          return githubAPI.repos.getContent({
-            owner: GITHUB_USER,
-            path: 'oldlib/deviceSpecs/specifications.js',
-            repo: GITHUB_CLI_REPOSITORY
-          });
-
-        case 25:
-          specificationsResponse = _context3.sent;
-
-
-          _fs2.default.writeFileSync(SPECIFICATIONS_FILE, new Buffer(specificationsResponse.content, 'base64').toString());
-
-          _context3.next = 29;
-          return githubAPI.repos.getContent({
-            owner: GITHUB_USER,
-            path: 'system/system-versions.md',
-            repo: GITHUB_FIRMWARE_REPOSITORY
-          });
-
-        case 29:
-          versionResponse = _context3.sent;
-          versionText = new Buffer(versionResponse.content, 'base64').toString() || '';
-
-          if (versionText) {
-            _context3.next = 33;
-            break;
-          }
-
-          throw new Error("can't download system-versions file");
-
-        case 33:
-          mapping = (0, _nullthrows2.default)(versionText.match(/^\|[^\n]*/gim)).map(function (line) {
-            return line.split('|').slice(2, 5);
-          }).filter(function (arr) {
-            return !isNaN(parseInt(arr[0], 10));
-          }).map(function (versionData) {
-            return [versionData[0].replace(/\s+/g, ''), versionData[1].replace(/\s+/g, '')];
-          });
-
-          if (!(mapping.length === 0)) {
-            _context3.next = 36;
-            break;
-          }
-
-          throw new Error('cant parse system-versions from ' + 'https://github.com/spark/firmware/blob/develop/system/system-versions.md');
-
-        case 36:
-          _fs2.default.writeFileSync(MAPPING_FILE, (0, _stringify2.default)(mapping, null, 2));
 
           console.log('\r\nCompleted Sync');
+          _context6.next = 27;
+          break;
 
-        case 38:
+        case 24:
+          _context6.prev = 24;
+          _context6.t1 = _context6['catch'](0);
+
+          console.log(_context6.t1);
+
+        case 27:
         case 'end':
-          return _context3.stop();
+          return _context6.stop();
       }
     }
-  }, _callee3, undefined);
+  }, _callee6, undefined, [[0, 24], [3, 8]]);
 }))();

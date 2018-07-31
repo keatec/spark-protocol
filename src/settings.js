@@ -19,11 +19,12 @@
  */
 
 import path from 'path';
+
 /* eslint-disable sorting/sort-object-props */
 export default {
-  BINARIES_DIRECTORY: path.join(__dirname, '../data/binaries'),
+  BINARIES_DIRECTORY: path.join(process.cwd(), 'data/binaries'),
   DEFAULT_EVENT_TTL: 60,
-  DEVICE_DIRECTORY: path.join(__dirname, '../data/deviceKeys'),
+  DEVICE_DIRECTORY: path.join(process.cwd(), 'data/deviceKeys'),
   TCP_DEVICE_SERVER_CONFIG: {
     ENABLE_SYSTEM_FIRWMARE_AUTOUPDATES: true,
     HOST: 'localhost',

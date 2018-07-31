@@ -231,7 +231,7 @@ function (_ref) {
       messageId: messageId,
       options: (0, _compactArray2.default)([].concat((0, _toConsumableArray3.default)(uriOptions), (0, _toConsumableArray3.default)(options || []), (0, _toConsumableArray3.default)(queryParams))),
       payload: data || new Buffer(0),
-      token: token && Buffer.from([token])
+      token: (token || token === 0) && Buffer.from([token])
     }));
   } catch (error) {
     logger.error({ err: error }, 'Coap Error');

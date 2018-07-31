@@ -4,98 +4,29 @@ import fs from 'fs';
 import { HalDescribeParser } from 'binary-version-reader';
 import nullthrows from 'nullthrows';
 import protocolSettings from '../settings';
-import settings from '../../third-party/settings.json';
-import specifications from '../../third-party/specifications';
-import versions from '../../third-party/versions.json';
-
-type OtaUpdate = {
-  address: string,
-  alt: string,
-  binaryFileName: string,
-};
-
-const platformSettings = Object.entries(specifications);
-const SPECIFICATION_KEY_BY_PLATFORM = new Map(
-  Object.values(settings.knownPlatforms)
-    .map((platform: mixed): [mixed, ?string] => {
-      const spec = platformSettings.find(
-        // eslint-disable-next-line no-unused-vars
-        ([key, value]: [string, mixed]): boolean =>
-          (value: any).productName === platform,
-      );
-
-      return [platform, spec && spec[0]];
-    })
-    .filter((item: [mixed, ?string]): boolean => !!item[1]),
-);
-const FIRMWARE_VERSION = versions.find(
-  (version: Array<*>): boolean => version[1] === settings.versionNumber,
-)[0];
+import FirmwareSettings from '../../third-party/settings.json';
 
 class FirmwareManager {
-  static getOtaSystemUpdateConfig = async (
-    systemInformation: Object,
-  ): Promise<*> => {
-    const parser = new HalDescribeParser();
-    const platformID = systemInformation.p;
-    const modules = parser
-      .getModules(systemInformation)
-      // Filter so we only have the system modules
-      .filter((module: Object): boolean => module.func === 's');
-
-    if (!modules) {
-      throw new Error('Could not find any system modules for OTA update');
-    }
-    const moduleToUpdate = modules.find(
-      (module: Object): boolean => module.version < FIRMWARE_VERSION,
+  static isMissingOTAUpdate = (systemInformation: Object): boolean =>
+    !!FirmwareManager._getMissingModule(systemInformation);
+  static getOtaSystemUpdateConfig = (systemInformation: Object): * => {
+    const firstDependency = FirmwareManager._getMissingModule(
+      systemInformation,
     );
-
-    if (!moduleToUpdate) {
-      // This should happen the majority of times
+    if (!firstDependency) {
       return null;
-    }
-
-    const otaUpdateConfig = FirmwareManager.getOtaUpdateConfig(platformID);
-    if (!otaUpdateConfig) {
-      throw new Error('Could not find OTA update config for device');
-    }
-
-    const moduleIndex = modules.indexOf(moduleToUpdate);
-
-    const config = otaUpdateConfig[moduleIndex];
-    if (!config) {
-      throw new Error('Cannot find the module for updating');
     }
 
     const systemFile = fs.readFileSync(
-      `${protocolSettings.BINARIES_DIRECTORY}/${config.binaryFileName}`,
+      `${protocolSettings.BINARIES_DIRECTORY}/${firstDependency.filename}`,
     );
 
     return {
-      moduleIndex,
+      moduleFunction: firstDependency.moduleFunction,
+      moduleIndex: firstDependency.moduleIndex,
       systemFile,
     };
   };
-
-  static getOtaUpdateConfig(platformID: number): ?Array<OtaUpdate> {
-    const platform = settings.knownPlatforms[platformID.toString()];
-    const key = SPECIFICATION_KEY_BY_PLATFORM.get(platform);
-
-    if (!key) {
-      return null;
-    }
-
-    const firmwareSettings = settings.updates[key];
-    if (!key) {
-      return null;
-    }
-
-    const firmwareKeys = Object.keys(firmwareSettings);
-    return firmwareKeys.map((firmwareKey: string): Object => ({
-      ...specifications[key][firmwareKey],
-      binaryFileName: firmwareSettings[firmwareKey],
-    }));
-  }
 
   static getAppModule = (systemInformation: Object): Object => {
     const parser = new HalDescribeParser();
@@ -105,6 +36,99 @@ class FirmwareManager {
         // Filter so we only have the app modules
         .find((module: Object): boolean => module.func === 'u'),
     );
+  };
+
+  static _getMissingModule = (systemInformation: Object): ?Object => {
+    const platformID = systemInformation.p;
+
+    const modules = systemInformation.m;
+
+    // This grabs all the dependencies from modules that have them defined.
+    // This filters out any dependencies that have already been installed
+    // or that are older than the currently installed modules.
+    const knownMissingDependencies = modules
+      .reduce((deps: Array<any>, module: any): Array<any> => [
+        ...deps,
+        ...module.d,
+      ])
+      .filter((dep: any): boolean => {
+        const oldModuleExistsForSlot = modules.some(
+          (m: any): boolean => m.f === dep.f && m.n === dep.n && m.v < dep.v,
+        );
+        // If the new dependency doesn't have an existing module installed.
+        // If the firmware goes from 2 parts to 3 parts
+        const moduleNotInstalled = !modules.some(
+          (m: any): boolean => m.f === dep.f && m.n === dep.n,
+        );
+
+        return oldModuleExistsForSlot || moduleNotInstalled;
+      }, []);
+
+    if (!knownMissingDependencies.length) {
+      return null;
+    }
+
+    const numberByFunction = {
+      b: 2,
+      s: 4,
+      u: 5,
+    };
+
+    // Map dependencies to firmware metadata
+    const knownFirmwares = knownMissingDependencies.map((dep: any): any =>
+      FirmwareSettings.find(
+        ({ prefixInfo }: { prefixInfo: any }): boolean =>
+          prefixInfo.platformID === platformID &&
+          prefixInfo.moduleVersion === dep.v &&
+          prefixInfo.moduleFunction === numberByFunction[dep.f] &&
+          prefixInfo.moduleIndex === parseInt(dep.n, 10),
+      ),
+    );
+
+    if (!knownFirmwares.length) {
+      return null;
+    }
+
+    // Walk firmware metadata to get all required firmware for the current
+    // version.
+    const allFirmware = [...knownFirmwares];
+    while (knownFirmwares.length) {
+      const current = knownFirmwares.pop();
+      const {
+        depModuleVersion,
+        depModuleFunction,
+        depModuleIndex,
+      } = current.prefixInfo;
+      const foundFirmware = FirmwareSettings.find(
+        ({ prefixInfo }: { prefixInfo: any }): boolean =>
+          prefixInfo.platformID === platformID &&
+          prefixInfo.moduleVersion === depModuleVersion &&
+          prefixInfo.moduleFunction === depModuleFunction &&
+          prefixInfo.moduleIndex === depModuleIndex,
+      );
+
+      if (foundFirmware) {
+        knownFirmwares.push(foundFirmware);
+        allFirmware.push(foundFirmware);
+      }
+    }
+
+    // Find the first dependency that isn't already installed
+    return allFirmware
+      .filter((firmware: any): boolean => {
+        const {
+          moduleVersion,
+          moduleFunction,
+          moduleIndex,
+        } = firmware.prefixInfo;
+        return !modules.some(
+          (module: any): boolean =>
+            module.v === moduleVersion &&
+            numberByFunction[module.f] === moduleFunction &&
+            parseInt(module.n, 10) === moduleIndex,
+        );
+      })
+      .pop();
   };
 
   getKnownAppFileName = (): ?string => {

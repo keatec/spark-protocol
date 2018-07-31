@@ -19,4 +19,5 @@ var ProtocolErrors = [[0, 'NO_ERROR'], [1, 'PING_TIMEOUT'], [2, 'IO_ERROR'], // 
  */
 [0x7ffff, 'UNKNOWN']];
 
-exports.default = new _map2.default(ProtocolErrors);
+var OUTPUT = new _map2.default(ProtocolErrors);
+exports.default = OUTPUT;

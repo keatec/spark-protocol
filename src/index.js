@@ -28,7 +28,7 @@ import JSONFileManager from './repository/JSONFileManager';
 import ServerKeyFileRepository from './repository/ServerKeyFileRepository';
 import Device from './clients/Device';
 import * as settings from './settings';
-import { knownPlatforms } from '../third-party/settings.json';
+import { FirmwareSettings } from '../third-party/settings.json';
 import defaultBindings from './defaultBindings';
 import memoizeGet from './decorators/memoizeGet';
 import memoizeSet from './decorators/memoizeSet';
@@ -43,8 +43,8 @@ export {
   DeviceServer,
   EventPublisher,
   FileManager,
+  FirmwareSettings,
   JSONFileManager,
-  knownPlatforms,
   memoizeGet,
   memoizeSet,
   ServerKeyFileRepository,

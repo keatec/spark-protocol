@@ -20,7 +20,7 @@
 
 import type { Socket } from 'net';
 import type { Duplex } from 'stream';
-import type { DeviceAttributes, Event } from '../types';
+import type { DeviceAttributes, ProtocolEvent } from '../types';
 import type Handshake from '../lib/Handshake';
 import type { MessageType } from '../lib/MessageSpecifications';
 import type { FileTransferStoreType } from '../lib/FileTransferStore';
@@ -108,6 +108,7 @@ export const SYSTEM_EVENT_NAMES = {
   LAST_RESET: 'spark/device/last_reset', // This should just have a friendly string in its payload.
   MAX_BINARY: 'spark/hardware/max_binary',
   OTA_CHUNK_SIZE: 'spark/hardware/ota_chunk_size',
+  OTA_RESULT: 'spark/device/ota_result',
   RESET: 'spark/device/reset', // send this to reset passing "safe mode"/"dfu"/"reboot"
   SAFE_MODE: 'spark/device/safemode',
   SAFE_MODE_UPDATING: 'spark/safe-mode-updater/updating',
@@ -153,11 +154,23 @@ class Device extends EventEmitter {
     reservedFlags: 0,
     variables: null,
   };
+  _attributesFromDevice: {
+    particleProductId: number,
+    platformId: number,
+    productFirmwareVersion: number,
+    reservedFlags: number,
+  } = {
+    particleProductId: 0,
+    platformId: 0,
+    productFirmwareVersion: 0,
+    reservedFlags: 0,
+  };
   _cipherStream: ?Duplex = null;
   _connectionKey: ?string = null;
   _connectionStartTime: ?Date = null;
   _decipherStream: ?Duplex = null;
   _disconnectCounter: number = 0;
+  _isFlashing: boolean = false;
   _maxBinarySize: ?number = null;
   _otaChunkSize: ?number = null;
   _owningFlasher: ?Flasher;
@@ -180,11 +193,16 @@ class Device extends EventEmitter {
     this._handshake = handshake;
   }
 
-  getAttributes = (): DeviceAttributes => this._attributes;
+  getAttributes = (): DeviceAttributes => ({
+    ...this._attributes,
+    ...this._attributesFromDevice,
+  });
 
   getStatus = (): DeviceStatus => this._status;
 
   getSystemInformation = (): Object => nullthrows(this._systemInformation);
+
+  isFlashing = (): boolean => this._isFlashing;
 
   updateAttributes = (
     attributes: $Shape<DeviceAttributes>,
@@ -192,6 +210,7 @@ class Device extends EventEmitter {
     this._attributes = {
       ...this._attributes,
       ...attributes,
+      ...this._attributesFromDevice,
     };
 
     return this._attributes;
@@ -324,10 +343,10 @@ class Device extends EventEmitter {
         {
           cache_key: this._connectionKey,
           deviceID: this.getDeviceID(),
-          firmwareVersion: this._attributes.productFirmwareVersion,
+          firmwareVersion: this._attributesFromDevice.productFirmwareVersion,
           ip: this.getRemoteIPAddress(),
-          platformID: this._attributes.platformId,
-          productID: this._attributes.particleProductId,
+          particleProductId: this._attributesFromDevice.particleProductId,
+          platformId: this._attributesFromDevice.platformId,
         },
         'On device protocol initialization complete',
       );
@@ -366,12 +385,16 @@ class Device extends EventEmitter {
         return null;
       }
 
-      return {
+      this._attributesFromDevice = {
         particleProductId: payload.readUInt16BE(0),
         platformId: payload.readUInt16BE(6),
         productFirmwareVersion: payload.readUInt16BE(2),
         reservedFlags: payload.readUInt16BE(4),
       };
+
+      console.log('Connection attributes', this._attributesFromDevice);
+
+      return this._attributesFromDevice;
     } catch (error) {
       logger.error({ err: error }, 'error while parsing hello payload ');
       return null;
@@ -485,7 +508,6 @@ class Device extends EventEmitter {
     requester: ?Object,
   ) => {
     if (!this._isSocketAvailable(requester || null, messageName)) {
-      logger.error({ messageName }, 'This client has an exclusive lock.');
       return;
     }
 
@@ -518,6 +540,7 @@ class Device extends EventEmitter {
       );
       return;
     }
+
     this._cipherStream.write(message);
   };
 
@@ -529,7 +552,6 @@ class Device extends EventEmitter {
     requester?: Object,
   ): number => {
     if (!this._isSocketAvailable(requester, messageName)) {
-      logger.error({ messageName }, 'This client has an exclusive lock.');
       return -1;
     }
 
@@ -788,6 +810,8 @@ class Device extends EventEmitter {
       throw new Error('This device is locked during the flashing process.');
     }
 
+    this._isFlashing = true;
+
     const flasher = new Flasher(this, this._maxBinarySize, this._otaChunkSize);
     try {
       logger.info(
@@ -809,6 +833,7 @@ class Device extends EventEmitter {
       );
 
       this.emit(DEVICE_EVENT_NAMES.FLASH_SUCCESS);
+      this._isFlashing = false;
 
       return { status: 'Update finished' };
     } catch (error) {
@@ -819,6 +844,8 @@ class Device extends EventEmitter {
         },
         'flash device failed! - sending api event',
       );
+
+      this._isFlashing = false;
 
       this.emit(DEVICE_EVENT_NAMES.FLASH_FAILED);
       throw new Error(`Update failed: ${error.message}`);
@@ -978,11 +1005,11 @@ class Device extends EventEmitter {
   //-------------
   // Device Events / Spark.publish / Spark.subscribe
   //-------------
-  onDeviceEvent = (event: Event) => {
+  onDeviceEvent = (event: ProtocolEvent) => {
     this.sendDeviceEvent(event);
   };
 
-  sendDeviceEvent = (event: Event) => {
+  sendDeviceEvent = (event: ProtocolEvent) => {
     const { data, isPublic, name, ttl } = event;
     const messageName = isPublic
       ? DEVICE_MESSAGE_EVENTS_NAMES.PUBLIC_EVENT
@@ -991,7 +1018,7 @@ class Device extends EventEmitter {
     this.sendMessage(
       messageName,
       {
-        event_name: name.toString(),
+        event_name: name,
       },
       [
         {
@@ -1016,7 +1043,7 @@ class Device extends EventEmitter {
     );
 
   _toHexString = (value: number): string =>
-    (value < 10 ? '0' : '') + value.toString(16);
+    Buffer.from([value]).toString('hex');
 
   getDeviceID = (): string => this._attributes.deviceID;
 

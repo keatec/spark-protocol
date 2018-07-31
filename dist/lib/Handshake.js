@@ -295,7 +295,7 @@ var Handshake = function Handshake(cryptoManager) {
                 break;
               }
 
-              throw new Error('handshake data decryption failed');
+              throw new Error('handshake data decryption failed. ' + 'You probably have incorrect server key for device');
 
             case 3:
               if (!(decryptedHandshakeData.length < NONCE_BYTES + ID_BYTES)) {
@@ -369,42 +369,24 @@ var Handshake = function Handshake(cryptoManager) {
               publicKey = _context5.sent;
 
               if (publicKey) {
-                _context5.next = 9;
+                _context5.next = 5;
                 break;
               }
 
-              if (!deviceProvidedPem) {
-                _context5.next = 8;
-                break;
-              }
-
-              _context5.next = 7;
-              return _this._cryptoManager.createDevicePublicKey(deviceID, deviceProvidedPem);
-
-            case 7:
-              return _context5.abrupt('return', _context5.sent);
-
-            case 8:
               throw new Error('no public key found for device: ' + deviceID);
 
-            case 9:
+            case 5:
               if (publicKey.equals(deviceProvidedPem)) {
-                _context5.next = 14;
+                _context5.next = 7;
                 break;
               }
 
-              logger.error('TODO: KEY PASSED TO DEVICE DURING HANDSHAKE DOESNT MATCH SAVED PUBLIC KEY');
+              throw new Error("key passed to device during handshake doesn't" + ('match saved public key: ' + deviceID));
 
-              _context5.next = 13;
-              return _this._cryptoManager.createDevicePublicKey(deviceID, deviceProvidedPem);
-
-            case 13:
-              return _context5.abrupt('return', _context5.sent);
-
-            case 14:
+            case 7:
               return _context5.abrupt('return', publicKey);
 
-            case 15:
+            case 8:
             case 'end':
               return _context5.stop();
           }

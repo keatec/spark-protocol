@@ -121,9 +121,10 @@ class Handshake {
       const logInfo = {
         cache_key: this._device && this._device._connectionKey,
         deviceID: this._deviceID || null,
-        ip: this._socket && this._socket.remoteAddress
-          ? this._socket.remoteAddress.toString()
-          : 'unknown',
+        ip:
+          this._socket && this._socket.remoteAddress
+            ? this._socket.remoteAddress.toString()
+            : 'unknown',
       };
 
       logger.error({ err: error, logInfo }, 'Handshake failed');
@@ -226,7 +227,10 @@ class Handshake {
     const decryptedHandshakeData = this._cryptoManager.decrypt(data);
 
     if (!decryptedHandshakeData) {
-      throw new Error('handshake data decryption failed');
+      throw new Error(
+        'handshake data decryption failed. ' +
+          'You probably have incorrect server key for device',
+      );
     }
 
     if (decryptedHandshakeData.length < NONCE_BYTES + ID_BYTES) {
@@ -305,24 +309,13 @@ class Handshake {
     const publicKey = await this._cryptoManager.getDevicePublicKey(deviceID);
 
     if (!publicKey) {
-      if (deviceProvidedPem) {
-        return await this._cryptoManager.createDevicePublicKey(
-          deviceID,
-          deviceProvidedPem,
-        );
-      }
-
       throw new Error(`no public key found for device: ${deviceID}`);
     }
 
     if (!publicKey.equals(deviceProvidedPem)) {
-      logger.error(
-        'TODO: KEY PASSED TO DEVICE DURING HANDSHAKE DOESNT MATCH SAVED PUBLIC KEY',
-      );
-
-      return await this._cryptoManager.createDevicePublicKey(
-        deviceID,
-        deviceProvidedPem,
+      throw new Error(
+        "key passed to device during handshake doesn't" +
+          `match saved public key: ${deviceID}`,
       );
     }
 

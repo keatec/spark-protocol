@@ -162,6 +162,7 @@ var SYSTEM_EVENT_NAMES = exports.SYSTEM_EVENT_NAMES = {
   LAST_RESET: 'spark/device/last_reset', // This should just have a friendly string in its payload.
   MAX_BINARY: 'spark/hardware/max_binary',
   OTA_CHUNK_SIZE: 'spark/hardware/ota_chunk_size',
+  OTA_RESULT: 'spark/device/ota_result',
   RESET: 'spark/device/reset', // send this to reset passing "safe mode"/"dfu"/"reboot"
   SAFE_MODE: 'spark/device/safemode',
   SAFE_MODE_UPDATING: 'spark/safe-mode-updater/updating',
@@ -217,11 +218,18 @@ var Device = function (_EventEmitter) {
       reservedFlags: 0,
       variables: null
     };
+    _this._attributesFromDevice = {
+      particleProductId: 0,
+      platformId: 0,
+      productFirmwareVersion: 0,
+      reservedFlags: 0
+    };
     _this._cipherStream = null;
     _this._connectionKey = null;
     _this._connectionStartTime = null;
     _this._decipherStream = null;
     _this._disconnectCounter = 0;
+    _this._isFlashing = false;
     _this._maxBinarySize = null;
     _this._otaChunkSize = null;
     _this._receiveCounter = 0;
@@ -233,7 +241,7 @@ var Device = function (_EventEmitter) {
     _this._tokens = {};
 
     _this.getAttributes = function () {
-      return _this._attributes;
+      return (0, _extends3.default)({}, _this._attributes, _this._attributesFromDevice);
     };
 
     _this.getStatus = function () {
@@ -244,8 +252,12 @@ var Device = function (_EventEmitter) {
       return (0, _nullthrows2.default)(_this._systemInformation);
     };
 
+    _this.isFlashing = function () {
+      return _this._isFlashing;
+    };
+
     _this.updateAttributes = function (attributes) {
-      _this._attributes = (0, _extends3.default)({}, _this._attributes, attributes);
+      _this._attributes = (0, _extends3.default)({}, _this._attributes, attributes, _this._attributesFromDevice);
 
       return _this._attributes;
     };
@@ -446,10 +458,10 @@ var Device = function (_EventEmitter) {
               logger.info({
                 cache_key: _this._connectionKey,
                 deviceID: _this.getDeviceID(),
-                firmwareVersion: _this._attributes.productFirmwareVersion,
+                firmwareVersion: _this._attributesFromDevice.productFirmwareVersion,
                 ip: _this.getRemoteIPAddress(),
-                platformID: _this._attributes.platformId,
-                productID: _this._attributes.particleProductId
+                particleProductId: _this._attributesFromDevice.particleProductId,
+                platformId: _this._attributesFromDevice.platformId
               }, 'On device protocol initialization complete');
 
               return _context4.abrupt('return', _systemInformation);
@@ -490,12 +502,16 @@ var Device = function (_EventEmitter) {
           return null;
         }
 
-        return {
+        _this._attributesFromDevice = {
           particleProductId: payload.readUInt16BE(0),
           platformId: payload.readUInt16BE(6),
           productFirmwareVersion: payload.readUInt16BE(2),
           reservedFlags: payload.readUInt16BE(4)
         };
+
+        console.log('Connection attributes', _this._attributesFromDevice);
+
+        return _this._attributesFromDevice;
       } catch (error) {
         logger.error({ err: error }, 'error while parsing hello payload ');
         return null;
@@ -587,7 +603,6 @@ var Device = function (_EventEmitter) {
 
     _this.sendReply = function (messageName, id, data, token, requester) {
       if (!_this._isSocketAvailable(requester || null, messageName)) {
-        logger.error({ messageName: messageName }, 'This client has an exclusive lock.');
         return;
       }
 
@@ -614,12 +629,12 @@ var Device = function (_EventEmitter) {
         }, 'Device - sendReply before READY');
         return;
       }
+
       _this._cipherStream.write(message);
     };
 
     _this.sendMessage = function (messageName, params, options, data, requester) {
       if (!_this._isSocketAvailable(requester, messageName)) {
-        logger.error({ messageName: messageName }, 'This client has an exclusive lock.');
         return -1;
       }
 
@@ -951,8 +966,11 @@ var Device = function (_EventEmitter) {
                 throw new Error('This device is locked during the flashing process.');
 
               case 3:
+
+                _this._isFlashing = true;
+
                 flasher = new _Flasher2.default(_this, _this._maxBinarySize, _this._otaChunkSize);
-                _context9.prev = 4;
+                _context9.prev = 5;
 
                 logger.info({
                   deviceID: _this.getDeviceID()
@@ -960,37 +978,40 @@ var Device = function (_EventEmitter) {
 
                 _this.emit(DEVICE_EVENT_NAMES.FLASH_STARTED);
 
-                _context9.next = 9;
+                _context9.next = 10;
                 return flasher.startFlashBuffer(binary, fileTransferStore, address);
 
-              case 9:
+              case 10:
 
                 logger.info({
                   deviceID: _this.getDeviceID()
                 }, 'flash device finished! - sending api event');
 
                 _this.emit(DEVICE_EVENT_NAMES.FLASH_SUCCESS);
+                _this._isFlashing = false;
 
                 return _context9.abrupt('return', { status: 'Update finished' });
 
-              case 14:
-                _context9.prev = 14;
-                _context9.t0 = _context9['catch'](4);
+              case 16:
+                _context9.prev = 16;
+                _context9.t0 = _context9['catch'](5);
 
                 logger.info({
                   deviceID: _this.getDeviceID(),
                   error: _context9.t0
                 }, 'flash device failed! - sending api event');
 
+                _this._isFlashing = false;
+
                 _this.emit(DEVICE_EVENT_NAMES.FLASH_FAILED);
                 throw new Error('Update failed: ' + _context9.t0.message);
 
-              case 19:
+              case 22:
               case 'end':
                 return _context9.stop();
             }
           }
-        }, _callee9, _this2, [[4, 14]]);
+        }, _callee9, _this2, [[5, 16]]);
       }));
 
       return function (_x9) {
@@ -1154,7 +1175,7 @@ var Device = function (_EventEmitter) {
       var messageName = isPublic ? DEVICE_MESSAGE_EVENTS_NAMES.PUBLIC_EVENT : DEVICE_MESSAGE_EVENTS_NAMES.PRIVATE_EVENT;
 
       _this.sendMessage(messageName, {
-        event_name: name.toString()
+        event_name: name
       }, [{
         name: _CoapMessage2.default.Option.MAX_AGE,
         value: _CoapMessages2.default.toBinary(ttl, 'uint32')
@@ -1172,7 +1193,7 @@ var Device = function (_EventEmitter) {
     };
 
     _this._toHexString = function (value) {
-      return (value < 10 ? '0' : '') + value.toString(16);
+      return Buffer.from([value]).toString('hex');
     };
 
     _this.getDeviceID = function () {

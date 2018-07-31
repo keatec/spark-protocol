@@ -51,7 +51,7 @@ class CryptoManager {
   };
 
   _createServerKeys = async (): Promise<NodeRSA> => {
-    const privateKey = new NodeRSA({ b: 1024 });
+    const privateKey = new NodeRSA({ b: 2048 });
 
     await this._serverKeyRepository.createKeys(
       privateKey.exportKey('pkcs1-private-pem'),
@@ -107,7 +107,13 @@ class CryptoManager {
     return output;
   };
 
-  decrypt = (data: Buffer): Buffer => this._serverPrivateKey.decrypt(data);
+  decrypt = (data: Buffer): ?Buffer => {
+    try {
+      return this._serverPrivateKey.decrypt(data);
+    } catch (error) {
+      return null;
+    }
+  };
 
   getDevicePublicKey = async (deviceID: string): Promise<?DeviceKey> => {
     const publicKeyObject = await this._deviceKeyRepository.getByID(deviceID);

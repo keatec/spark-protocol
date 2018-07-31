@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.SPARK_SERVER_EVENTS = exports.settings = exports.ServerKeyFileRepository = exports.memoizeSet = exports.memoizeGet = exports.knownPlatforms = exports.JSONFileManager = exports.FileManager = exports.EventPublisher = exports.DeviceServer = exports.DeviceKeyFileRepository = exports.DeviceAttributeFileRepository = exports.Device = exports.defaultBindings = exports.ClaimCodeManager = undefined;
+exports.SPARK_SERVER_EVENTS = exports.settings = exports.ServerKeyFileRepository = exports.memoizeSet = exports.memoizeGet = exports.JSONFileManager = exports.FirmwareSettings = exports.FileManager = exports.EventPublisher = exports.DeviceServer = exports.DeviceKeyFileRepository = exports.DeviceAttributeFileRepository = exports.Device = exports.defaultBindings = exports.ClaimCodeManager = undefined;
 
 var _DeviceAttributeFileRepository = require('./repository/DeviceAttributeFileRepository');
 
@@ -75,8 +75,8 @@ exports.DeviceKeyFileRepository = _DeviceKeyFileRepository2.default;
 exports.DeviceServer = _DeviceServer2.default;
 exports.EventPublisher = _EventPublisher2.default;
 exports.FileManager = _FileManager2.default;
+exports.FirmwareSettings = _settings2.FirmwareSettings;
 exports.JSONFileManager = _JSONFileManager2.default;
-exports.knownPlatforms = _settings2.knownPlatforms;
 exports.memoizeGet = _memoizeGet2.default;
 exports.memoizeSet = _memoizeSet2.default;
 exports.ServerKeyFileRepository = _ServerKeyFileRepository2.default;

@@ -32,7 +32,10 @@ class DeviceKey {
     if (this._nodeRsa) {
       return this._nodeRsa.encrypt(data);
     } else if (this._ecKey) {
-      return this._ecKey.createSign('SHA256').update(data).sign();
+      return this._ecKey
+        .createSign('SHA256')
+        .update(data)
+        .sign();
     }
 
     throw new Error(`Key not implemented ${data.toString()}`);

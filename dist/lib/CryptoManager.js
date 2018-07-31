@@ -71,7 +71,7 @@ var CryptoManager = (_temp = _class = function CryptoManager(deviceKeyRepository
       while (1) {
         switch (_context.prev = _context.next) {
           case 0:
-            privateKey = new _nodeRsa2.default({ b: 1024 });
+            privateKey = new _nodeRsa2.default({ b: 2048 });
             _context.next = 3;
             return _this._serverKeyRepository.createKeys(privateKey.exportKey('pkcs1-private-pem'), privateKey.exportKey('pkcs8-public-pem'));
 
@@ -176,7 +176,11 @@ var CryptoManager = (_temp = _class = function CryptoManager(deviceKeyRepository
   }();
 
   this.decrypt = function (data) {
-    return _this._serverPrivateKey.decrypt(data);
+    try {
+      return _this._serverPrivateKey.decrypt(data);
+    } catch (error) {
+      return null;
+    }
   };
 
   this.getDevicePublicKey = function () {

@@ -198,7 +198,7 @@ class Flasher {
 
             failReason = !Number.isNaN(failReason)
               ? ProtocolErrors.get(Number.parseInt(failReason, 10)) ||
-                  failReason
+                failReason
               : failReason;
 
             throw new Error(`aborted: ${failReason}`);

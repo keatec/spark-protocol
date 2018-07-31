@@ -38,6 +38,14 @@ var _CryptoManager = require('./lib/CryptoManager');
 
 var _CryptoManager2 = _interopRequireDefault(_CryptoManager);
 
+var _MockProductDeviceRepository = require('./repository/MockProductDeviceRepository');
+
+var _MockProductDeviceRepository2 = _interopRequireDefault(_MockProductDeviceRepository);
+
+var _MockProductFirmwareRepository = require('./repository/MockProductFirmwareRepository');
+
+var _MockProductFirmwareRepository2 = _interopRequireDefault(_MockProductFirmwareRepository);
+
 var _ServerKeyFileRepository = require('./repository/ServerKeyFileRepository');
 
 var _ServerKeyFileRepository2 = _interopRequireDefault(_ServerKeyFileRepository);
@@ -60,18 +68,22 @@ var defaultBindings = function defaultBindings(container, serverSettings) {
   container.bindValue('TCP_DEVICE_SERVER_CONFIG', mergedSettings.TCP_DEVICE_SERVER_CONFIG);
 
   // Repository
-  container.bindClass('DeviceAttributeRepository', _DeviceAttributeFileRepository2.default, ['DEVICE_DIRECTORY']);
-  container.bindClass('DeviceKeyRepository', _DeviceKeyFileRepository2.default, ['DEVICE_DIRECTORY']);
+  container.bindClass('IDeviceAttributeRepository', _DeviceAttributeFileRepository2.default, ['DEVICE_DIRECTORY']);
+
+  container.bindClass('IDeviceKeyRepository', _DeviceKeyFileRepository2.default, ['DEVICE_DIRECTORY']);
+  container.bindClass('IProductDeviceRepository', _MockProductDeviceRepository2.default);
+  container.bindClass('IProductFirmwareRepository', _MockProductFirmwareRepository2.default);
+
   container.bindClass('ServerKeyRepository', _ServerKeyFileRepository2.default, ['SERVER_KEYS_DIRECTORY', 'SERVER_KEY_FILENAME']);
 
   // Utils
   container.bindClass('EventPublisher', _EventPublisher2.default, []);
   container.bindClass('EVENT_PROVIDER', _EventProvider2.default, ['EventPublisher']);
   container.bindClass('ClaimCodeManager', _ClaimCodeManager2.default, []);
-  container.bindClass('CryptoManager', _CryptoManager2.default, ['DeviceKeyRepository', 'ServerKeyRepository', 'SERVER_KEY_PASSWORD']);
+  container.bindClass('CryptoManager', _CryptoManager2.default, ['IDeviceKeyRepository', 'ServerKeyRepository', 'SERVER_KEY_PASSWORD']);
 
   // Device server
-  container.bindClass('DeviceServer', _DeviceServer2.default, ['DeviceAttributeRepository', 'ClaimCodeManager', 'CryptoManager', 'EventPublisher', 'TCP_DEVICE_SERVER_CONFIG', 'ENABLE_SYSTEM_FIRWMARE_AUTOUPDATES']);
+  container.bindClass('DeviceServer', _DeviceServer2.default, ['IDeviceAttributeRepository', 'IProductDeviceRepository', 'IProductFirmwareRepository', 'ClaimCodeManager', 'CryptoManager', 'EventPublisher', 'TCP_DEVICE_SERVER_CONFIG', 'ENABLE_SYSTEM_FIRWMARE_AUTOUPDATES']);
 };
 
 exports.default = defaultBindings;

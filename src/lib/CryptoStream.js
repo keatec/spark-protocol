@@ -62,9 +62,10 @@ class CryptoStream extends Transform {
     try {
       const data = ((chunk: any): Buffer);
       const cipherParams = [settings.CRYPTO_ALGORITHM, this._key, this._iv];
-      const cipher = this._streamType === 'encrypt'
-        ? crypto.createCipheriv(...cipherParams)
-        : crypto.createDecipheriv(...cipherParams);
+      const cipher =
+        this._streamType === 'encrypt'
+          ? crypto.createCipheriv(...cipherParams)
+          : crypto.createDecipheriv(...cipherParams);
 
       const transformedData = cipher.update(data);
       const extraData = cipher.final();

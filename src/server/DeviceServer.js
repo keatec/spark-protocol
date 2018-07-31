@@ -20,9 +20,12 @@
 
 import type { Socket } from 'net';
 import type {
-  Event,
   EventData,
   IDeviceAttributeRepository,
+  IProductDeviceRepository,
+  IProductFirmwareRepository,
+  ProductDevice,
+  ProtocolEvent,
   PublishOptions,
 } from '../types';
 import type ClaimCodeManager from '../lib/ClaimCodeManager';
@@ -69,28 +72,34 @@ const SPECIAL_EVENTS = [
 
 let connectionIdCounter = 0;
 class DeviceServer {
+  _areSystemFirmwareAutoupdatesEnabled: boolean;
   _claimCodeManager: ClaimCodeManager;
   _config: DeviceServerConfig;
   _cryptoManager: CryptoManager;
   _deviceAttributeRepository: IDeviceAttributeRepository;
   _devicesById: Map<string, Device> = new Map();
-  _areSystemFirmwareAutoupdatesEnabled: boolean;
   _eventPublisher: EventPublisher;
+  _productDeviceRepository: IProductDeviceRepository;
+  _productFirmwareRepository: IProductFirmwareRepository;
 
   constructor(
     deviceAttributeRepository: IDeviceAttributeRepository,
+    productDeviceRepository: IProductDeviceRepository,
+    productFirmwareRepository: IProductFirmwareRepository,
     claimCodeManager: ClaimCodeManager,
     cryptoManager: CryptoManager,
     eventPublisher: EventPublisher,
     deviceServerConfig: DeviceServerConfig,
     areSystemFirmwareAutoupdatesEnabled: boolean,
   ) {
+    this._areSystemFirmwareAutoupdatesEnabled = areSystemFirmwareAutoupdatesEnabled;
     this._config = deviceServerConfig;
-    this._deviceAttributeRepository = deviceAttributeRepository;
     this._cryptoManager = cryptoManager;
     this._claimCodeManager = claimCodeManager;
+    this._deviceAttributeRepository = deviceAttributeRepository;
     this._eventPublisher = eventPublisher;
-    this._areSystemFirmwareAutoupdatesEnabled = areSystemFirmwareAutoupdatesEnabled;
+    this._productDeviceRepository = productDeviceRepository;
+    this._productFirmwareRepository = productFirmwareRepository;
   }
 
   start() {
@@ -129,6 +138,11 @@ class DeviceServer {
       this._onSparkServerUpdateDeviceAttributesRequest,
     );
 
+    this._eventPublisher.subscribe(
+      SPARK_SERVER_EVENTS.FLASH_PRODUCT_FIRMWARE,
+      this._onFlashProductFirmware,
+    );
+
     const server = net.createServer((socket: Socket): void =>
       process.nextTick((): Promise<void> =>
         this._onNewSocketConnection(socket),
@@ -161,9 +175,7 @@ class DeviceServer {
     const { deviceID, ownerID } = device.getAttributes();
     const systemInformation = device.getSystemInformation();
 
-    const config = await FirmwareManager.getOtaSystemUpdateConfig(
-      systemInformation,
-    );
+    const config = FirmwareManager.getOtaSystemUpdateConfig(systemInformation);
     if (!config) {
       return;
     }
@@ -172,7 +184,7 @@ class DeviceServer {
       this.publishSpecialEvent(
         SYSTEM_EVENT_NAMES.SAFE_MODE_UPDATING,
         // Lets the user know if it's the system update part 1/2/3
-        config.moduleIndex + 1,
+        config.moduleIndex,
         deviceID,
         ownerID,
         false,
@@ -182,8 +194,20 @@ class DeviceServer {
     }, 1000);
   };
 
+  _checkProductFirmwareForUpdate = async (
+    device: Device,
+    /*appModule: Object,*/
+  ): Promise<void> => {
+    const productDevice = await this._productDeviceRepository.getFromDeviceID(
+      device.getDeviceID(),
+    );
+
+    await this._flashDevice(productDevice);
+  };
+
   _onNewSocketConnection = async (socket: Socket): Promise<void> => {
     try {
+      logger.info('New Connection');
       connectionIdCounter += 1;
       const counter = connectionIdCounter;
       const connectionKey = `_${connectionIdCounter}`;
@@ -286,9 +310,17 @@ class DeviceServer {
           this._devicesById.set(deviceID, device);
 
           const systemInformation = await device.completeProtocolInitialization();
-          const { uuid: appHash } = FirmwareManager.getAppModule(
-            systemInformation,
-          );
+
+          let appModules;
+          try {
+            appModules = FirmwareManager.getAppModule(systemInformation);
+          } catch (ignore) {
+            appModules = { uuid: 'none' };
+          }
+
+          const { uuid: appHash } = appModules;
+
+          await this._checkProductFirmwareForUpdate(device /* appModule*/);
 
           const existingAttributes = await this._deviceAttributeRepository.getByID(
             deviceID,
@@ -348,6 +380,8 @@ class DeviceServer {
               false,
             );
           }
+
+          device.emit(DEVICE_EVENT_NAMES.READY);
         } catch (error) {
           device.disconnect(
             `Error during connection: ${error}: ${error.stack}`,
@@ -393,7 +427,9 @@ class DeviceServer {
   };
 
   _onDeviceGetTime = (packet: CoapPacket, device: Device) => {
-    const timeStamp = moment().utc().unix();
+    const timeStamp = moment()
+      .utc()
+      .unix();
     const binaryValue = CoapMessages.toBinary(timeStamp, 'uint32');
 
     device.sendReply(
@@ -420,6 +456,7 @@ class DeviceServer {
         name: CoapMessages.getUriPath(packet).substr(3),
         ttl: CoapMessages.getMaxAge(packet),
       };
+
       const publishOptions: PublishOptions = {
         isInternal: false,
         isPublic,
@@ -436,9 +473,10 @@ class DeviceServer {
         // events from it.
         publishOptions.isPublic = false;
 
-        shouldSwallowEvent = !SPECIAL_EVENTS.some(
-          (specialEvent: string): boolean => eventName.startsWith(specialEvent),
-        );
+        shouldSwallowEvent =
+          !SPECIAL_EVENTS.some((specialEvent: string): boolean =>
+            eventName.startsWith(specialEvent),
+          ) || device.isFlashing();
         if (shouldSwallowEvent) {
           device.sendReply('EventAck', packet.messageId);
         }
@@ -582,36 +620,36 @@ class DeviceServer {
     device: Device,
   ): Promise<void> => {
     await device.hasStatus(DEVICE_STATUS_MAP.READY);
-    const deviceAttributes = device.getAttributes();
-    const deviceID = deviceAttributes.deviceID;
-    let ownerID = deviceAttributes.ownerID;
-
-    // uri -> /e/?u    --> firehose for all my devices
-    // uri -> /e/ (deviceid in body)   --> allowed
-    // uri -> /e/    --> not allowed (no global firehose for cores, kthxplox)
-    // uri -> /e/event_name?u    --> all my devices
-    // uri -> /e/event_name?u (deviceid)    --> deviceid?
-    const messageName = CoapMessages.getUriPath(packet).substr(3);
-    const query = CoapMessages.getUriQuery(packet);
-    const isFromMyDevices = !!query.match('u');
-
-    if (!messageName) {
-      device.sendReply('SubscribeFail', packet.messageId);
-      return;
-    }
-
-    logger.info(
-      {
-        deviceID,
-        isFromMyDevices,
-        messageName,
-      },
-      'Subscribe Request',
-    );
-
-    device.sendReply('SubscribeAck', packet.messageId);
-
     process.nextTick(() => {
+      const deviceAttributes = device.getAttributes();
+      const deviceID = deviceAttributes.deviceID;
+      let ownerID = deviceAttributes.ownerID;
+
+      // uri -> /e/?u    --> firehose for all my devices
+      // uri -> /e/ (deviceid in body)   --> allowed
+      // uri -> /e/    --> not allowed (no global firehose for cores, kthxplox)
+      // uri -> /e/event_name?u    --> all my devices
+      // uri -> /e/event_name?u (deviceid)    --> deviceid?
+      const messageName = CoapMessages.getUriPath(packet).substr(3);
+      const query = CoapMessages.getUriQuery(packet);
+      const isFromMyDevices = !!query.match('u');
+
+      if (!messageName) {
+        device.sendReply('SubscribeFail', packet.messageId);
+        return;
+      }
+
+      logger.info(
+        {
+          deviceID,
+          isFromMyDevices,
+          messageName,
+        },
+        'Subscribe Request',
+      );
+
+      device.sendReply('SubscribeAck', packet.messageId);
+
       if (!ownerID) {
         logger.info(
           {
@@ -637,7 +675,7 @@ class DeviceServer {
   };
 
   _onSparkServerCallDeviceFunctionRequest = async (
-    event: Event,
+    event: ProtocolEvent,
   ): Promise<void> => {
     const {
       deviceID,
@@ -675,7 +713,9 @@ class DeviceServer {
     }
   };
 
-  _onSparkServerFlashDeviceRequest = async (event: Event): Promise<void> => {
+  _onSparkServerFlashDeviceRequest = async (
+    event: ProtocolEvent,
+  ): Promise<void> => {
     const { deviceID, fileBuffer, responseEventName } = nullthrows(
       event.context,
     );
@@ -709,7 +749,9 @@ class DeviceServer {
     }
   };
 
-  _onSparkServerGetDeviceAttributes = async (event: Event): Promise<void> => {
+  _onSparkServerGetDeviceAttributes = async (
+    event: ProtocolEvent,
+  ): Promise<void> => {
     const { deviceID, responseEventName } = nullthrows(event.context);
 
     try {
@@ -744,7 +786,7 @@ class DeviceServer {
   };
 
   _onSparkServerGetDeviceVariableValueRequest = async (
-    event: Event,
+    event: ProtocolEvent,
   ): Promise<void> => {
     const { deviceID, responseEventName, variableName } = nullthrows(
       event.context,
@@ -780,7 +822,9 @@ class DeviceServer {
     }
   };
 
-  _onSparkServerPingDeviceRequest = async (event: Event): Promise<void> => {
+  _onSparkServerPingDeviceRequest = async (
+    event: ProtocolEvent,
+  ): Promise<void> => {
     const { deviceID, responseEventName } = nullthrows(event.context);
 
     const device = this.getDevice(deviceID);
@@ -803,7 +847,9 @@ class DeviceServer {
     );
   };
 
-  _onSparkServerRaiseYourHandRequest = async (event: Event): Promise<void> => {
+  _onSparkServerRaiseYourHandRequest = async (
+    event: ProtocolEvent,
+  ): Promise<void> => {
     const { deviceID, responseEventName, shouldShowSignal } = nullthrows(
       event.context,
     );
@@ -841,7 +887,7 @@ class DeviceServer {
   };
 
   _onSparkServerUpdateDeviceAttributesRequest = async (
-    event: Event,
+    event: ProtocolEvent,
   ): Promise<void> => {
     const { attributes, deviceID, responseEventName } = nullthrows(
       event.context,
@@ -878,6 +924,142 @@ class DeviceServer {
         },
       );
     }
+  };
+
+  _onFlashProductFirmware = async (event: ProtocolEvent): Promise<void> => {
+    const { deviceID, productID } = nullthrows(event.context);
+
+    // Handle case where a new device is added to an existing product
+    if (deviceID) {
+      const productDevice = await this._productDeviceRepository.getFromDeviceID(
+        deviceID,
+      );
+
+      if (!productDevice || productDevice.productID !== productID) {
+        throw new Error(
+          `Device ${deviceID} does not belong to product ${productID}`,
+        );
+      }
+
+      await this._flashDevice(productDevice);
+
+      return;
+    }
+
+    // NOTE - In a giant system, this is probably a bad idea but
+    // we can worry about scaling this later. It will also be
+    // inefficient if there is any horizontal scaling :/
+    const productDevices = await this._productDeviceRepository.getAllByProductID(
+      productID,
+      0,
+      Number.MAX_VALUE,
+    );
+
+    // TODO - FIgure out if this breaks things for large amounts
+    // of devices. We will probably need to test with
+    // particle-collider. I used setImmediate and only flash
+    // one device at a time in hopes of limiting the server load
+    while (productDevices.length) {
+      const productDevice = productDevices.pop();
+      await new Promise((resolve: () => void) => {
+        setImmediate(async (): Promise<void> => {
+          await this._flashDevice(productDevice);
+          resolve();
+        });
+      });
+    }
+  };
+
+  _flashDevice = async (productDevice: ?ProductDevice): Promise<void> => {
+    if (
+      !productDevice ||
+      productDevice.denied ||
+      productDevice.development ||
+      productDevice.quarantined
+    ) {
+      return;
+    }
+
+    const device = this._devicesById.get(productDevice.deviceID);
+    if (!device) {
+      return;
+    }
+
+    if (device.isFlashing()) {
+      logger.info(
+        {
+          productDevice,
+        },
+        'Device already flashing',
+      );
+      return;
+    }
+
+    let productFirmware = null;
+
+    const lockedFirmwareVersion = productDevice.lockedFirmwareVersion;
+    const {
+      productFirmwareVersion,
+      particleProductId,
+    } = device.getAttributes();
+    if (
+      particleProductId === productDevice.productID &&
+      lockedFirmwareVersion === productFirmwareVersion
+    ) {
+      return;
+    }
+
+    if (lockedFirmwareVersion !== null) {
+      productFirmware = await this._productFirmwareRepository.getByVersionForProduct(
+        productDevice.productID,
+        nullthrows(lockedFirmwareVersion),
+      );
+    } else {
+      productFirmware = await this._productFirmwareRepository.getCurrentForProduct(
+        productDevice.productID,
+      );
+    }
+
+    if (!productFirmware) {
+      return;
+    }
+
+    // TODO - check appHash as well.  We should be saving this alongside the firmware
+    if (
+      productFirmware.product_id === particleProductId &&
+      productFirmware.version === productFirmwareVersion
+    ) {
+      return;
+    }
+
+    const systemInformation = device.getSystemInformation();
+    const isMissingDependency = FirmwareManager.isMissingOTAUpdate(
+      systemInformation,
+    );
+
+    if (isMissingDependency) {
+      return;
+    }
+
+    await device.flash(productFirmware.data);
+    const oldProductFirmware = await this._productFirmwareRepository.getByVersionForProduct(
+      productDevice.productID,
+      productFirmwareVersion,
+    );
+
+    // Update the number of devices on the firmware versions
+    if (oldProductFirmware) {
+      oldProductFirmware.device_count -= 1;
+      await this._productFirmwareRepository.updateByID(
+        oldProductFirmware.id,
+        oldProductFirmware,
+      );
+    }
+    productFirmware.device_count += 1;
+    await this._productFirmwareRepository.updateByID(
+      productFirmware.id,
+      productFirmware,
+    );
   };
 
   getDevice = (deviceID: string): ?Device => this._devicesById.get(deviceID);
