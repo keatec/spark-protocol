@@ -65,7 +65,7 @@ function CollectDotEnv() {
   var currentpath = process.cwd();
   while (currentpath.length > 0) {
     console.log('Lookup .env in ' + currentpath);
-    var cfg = _dotenv2.default.config(currentpath);
+    var cfg = _dotenv2.default.config({ path: currentpath });
     if (!cfg.error) {
       console.log('.env was used in ' + currentpath);
       break;
