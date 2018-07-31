@@ -13,6 +13,7 @@ import dotenv from 'dotenv';
 function CollectDotEnv() {
   let currentpath = process.cwd();
   while (currentpath.length > 0) {
+    console.log(`Lookup .env in ${currentpath}`);
     const cfg = dotenv.config(currentpath);
     if (!cfg.error) {
       console.log(`.env was used in ${currentpath}`);
@@ -20,7 +21,12 @@ function CollectDotEnv() {
     }
     const newpath = path.resolve(currentpath, '..');
     if (newpath === currentpath) {
-      console.log('.env was not found up from', process.cwd());
+      console.log(
+        '.env was not found up from',
+        process.cwd(),
+        'to',
+        currentpath,
+      );
       currentpath = '';
     } else {
       currentpath = newpath;

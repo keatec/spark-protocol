@@ -64,14 +64,15 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 function CollectDotEnv() {
   var currentpath = process.cwd();
   while (currentpath.length > 0) {
+    console.log('Lookup .env in ' + currentpath);
     var cfg = _dotenv2.default.config(currentpath);
     if (!cfg.error) {
       console.log('.env was used in ' + currentpath);
       break;
-    };
+    }
     var newpath = _path2.default.resolve(currentpath, '..');
     if (newpath === currentpath) {
-      console.log('.env was not found up from', process.cwd());
+      console.log('.env was not found up from', process.cwd(), 'to', currentpath);
       currentpath = '';
     } else {
       currentpath = newpath;
