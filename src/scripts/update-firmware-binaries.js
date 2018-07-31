@@ -10,7 +10,24 @@ import nullthrows from 'nullthrows';
 import { HalModuleParser } from 'binary-version-reader';
 import dotenv from 'dotenv';
 
-dotenv.config();
+function CollectDotEnv() {
+  let currentpath = process.cwd();
+  while (currentpath.length > 0) {
+    const cfg = dotenv.config(currentpath);
+    if (!cfg.error) {
+      console.log(`.env was used in ${currentpath}`);
+      break;
+    }
+    const newpath = path.resolve(currentpath, '..');
+    if (newpath === currentpath) {
+      console.log('.env was not found up from', process.cwd());
+      currentpath = '';
+    } else {
+      currentpath = newpath;
+    }
+  }
+}
+CollectDotEnv();
 
 const GITHUB_USER = 'particle-iot';
 const GITHUB_FIRMWARE_REPOSITORY = 'firmware';

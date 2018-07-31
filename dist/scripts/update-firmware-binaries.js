@@ -61,7 +61,25 @@ var _dotenv2 = _interopRequireDefault(_dotenv);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-_dotenv2.default.config();
+function CollectDotEnv() {
+  var currentpath = process.cwd();
+  while (true) {
+    var cfg = _dotenv2.default.config(currentpath);
+    if (!cfg.error) {
+      console.log('.env was used in ' + currentpath);
+      break;
+    };
+    var newpath = _path2.default.resolve(currentpath, '..');
+    if (newpath == currentpath) {
+      console.log('.env was not found up from', process.cwd());
+      break;
+    };
+    currentpath = newpath;
+  }
+}
+CollectDotEnv();
+
+process.exit();
 
 var GITHUB_USER = 'particle-iot';
 var GITHUB_FIRMWARE_REPOSITORY = 'firmware';
@@ -246,7 +264,7 @@ var downloadFirmwareBinaries = function () {
             switch (_context3.prev = _context3.next) {
               case 0:
                 if (!(binariesLeftToDownload.length > 0)) {
-                  _context3.next = 11;
+                  _context3.next = 10;
                   break;
                 }
 
@@ -267,11 +285,10 @@ var downloadFirmwareBinaries = function () {
                 _context3.t0.push.call(_context3.t0, _context3.t1);
 
               case 8:
-                ;
                 _context3.next = 0;
                 break;
 
-              case 11:
+              case 10:
               case 'end':
                 return _context3.stop();
             }
@@ -284,24 +301,27 @@ var downloadFirmwareBinaries = function () {
       };
     }();
 
-    var assetFileNames, binariesLeftToDownload;
+    var assetFileNames, binariesLeftToDownload, running, i;
     return _regenerator2.default.wrap(function _callee4$(_context4) {
       while (1) {
         switch (_context4.prev = _context4.next) {
           case 0:
             assetFileNames = [];
             binariesLeftToDownload = [].concat(assets);
-            ;
-            _context4.next = 5;
-            return _promise2.default.all([// Start asynchronus Downloads and wait until every instance has finished
-            download(), download(), download(), download(), download()]);
+            running = [];
 
-          case 5:
+            for (i = 0; i < 10; i += 1) {
+              running.push(download());
+            }
+            _context4.next = 6;
+            return _promise2.default.all(running);
+
+          case 6:
             return _context4.abrupt('return', assetFileNames.filter(function (item) {
               return !!item;
             }));
 
-          case 6:
+          case 7:
           case 'end':
             return _context4.stop();
         }
