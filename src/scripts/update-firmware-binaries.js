@@ -13,8 +13,7 @@ import dotenv from 'dotenv';
 function CollectDotEnv() {
   let currentpath = process.cwd();
   while (currentpath.length > 0) {
-    console.log(`Lookup .env in ${currentpath}`);
-    const cfg = dotenv.config({ path: currentpath });
+    const cfg = dotenv.config({ path: `${currentpath}/.env` });
     if (!cfg.error) {
       console.log(`.env was used in ${currentpath}`);
       break;

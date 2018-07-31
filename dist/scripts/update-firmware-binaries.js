@@ -64,8 +64,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 function CollectDotEnv() {
   var currentpath = process.cwd();
   while (currentpath.length > 0) {
-    console.log('Lookup .env in ' + currentpath);
-    var cfg = _dotenv2.default.config({ path: currentpath });
+    var cfg = _dotenv2.default.config({ path: currentpath + '/.env' });
     if (!cfg.error) {
       console.log('.env was used in ' + currentpath);
       break;
